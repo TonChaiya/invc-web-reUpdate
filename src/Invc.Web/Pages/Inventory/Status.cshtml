@@ -1,0 +1,65 @@
+@page
+@model Invc.Web.Pages.Inventory.StatusModel
+@{
+    ViewData["Title"] = "สถานะคงคลัง";
+}
+<h1 class="h3 mb-3">ระบบรายงานปริมาณยาและเวชภัณฑ์คงคลัง</h1>
+
+@if (Model.Error is not null)
+{
+    <div class="alert alert-danger">@Model.Error</div>
+}
+else
+{
+    @if (!string.IsNullOrWhiteSpace(Model.Keyword))
+    {
+        <p>ผลการค้นหา ( @Model.Keyword ) พบ @Model.Items.Count.ToString("N0") รายการ
+            <a class="ms-2" asp-page="/Inventory/Status">แสดงทั้งหมด</a></p>
+    }
+    else
+    {
+        <p>รายการยาที่ใช้งาน @Model.Items.Count.ToString("N0") รายการ</p>
+    }
+
+    <div class="table-responsive">
+        <table class="table table-sm table-striped table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th style="width:3rem">#</th>
+                    <th>ชื่อยา</th>
+                    <th class="text-center">VEN</th>
+                    <th class="text-center">รหัสยา</th>
+                    <th class="text-end">คงคลัง</th>
+                    <th class="text-center">หน่วย</th>
+                    <th class="text-center">Location</th>
+                    <th class="text-end">Rate เดือนก่อน</th>
+                    <th class="text-end">ยืมได้</th>
+                    <th class="text-end">เหลือใช้ได้ (เดือน)</th>
+                </tr>
+            </thead>
+            <tbody>
+            @{ var n = 0; }
+            @foreach (var item in Model.Items)
+            {
+                n++;
+                <tr>
+                    <td class="text-muted">@n</td>
+                    <td>@item.DrugName</td>
+                    <td class="text-center">@item.Ven</td>
+                    <td class="text-center">@item.WorkingCode@(string.IsNullOrEmpty(item.HospCode) ? "" : $" ({item.HospCode})")</td>
+                    <td class="text-end">@item.QtyOnHand.ToString("N0")</td>
+                    <td class="text-center">@item.SaleUnit</td>
+                    <td class="text-center">@item.Location</td>
+                    <td class="text-end">@(item.RatePerMonth?.ToString("N0"))</td>
+                    <td class="text-end">@item.BorrowableQty.ToString("N0")</td>
+                    <td class="text-end">@item.MonthsOfStockDisplay</td>
+                </tr>
+            }
+            @if (Model.Items.Count == 0)
+            {
+                <tr><td colspan="10" class="text-center text-muted">ไม่พบรายการ</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}

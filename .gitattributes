@@ -1,0 +1,16 @@
+# Line-ending policy: git stores LF, Windows checkouts get CRLF (matches the existing GitHub history).
+* text=auto
+
+# Binary legacy assets: never touched by git.
+*.rar binary
+*.zip binary
+*.gif binary
+*.jpg binary
+*.png binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.otf binary
+*.mdb binary

@@ -1,0 +1,18 @@
+# Project-local toolchain state (portable SDK, NuGet caches, temp, build state)
+.work/
+
+# Build output
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.vscode/
+TestResults/
+*.binlog
+
+# Secrets / local config
+appsettings.*.local.json
+appsettings.Local.json
+*.pfx
+secrets.json

@@ -1,0 +1,44 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "หน้าหลัก";
+}
+<h1 class="h3 mb-3">ระบบรายงานคลังเวชภัณฑ์ (INVC)</h1>
+
+@if (Model.Health is { IsHealthy: false })
+{
+    <div class="alert alert-danger">
+        เชื่อมต่อฐานข้อมูล INV ไม่ได้ — ดูรายละเอียดที่หน้า <a asp-page="/Health">สถานะระบบ</a>
+    </div>
+}
+else if (Model.Error is not null)
+{
+    <div class="alert alert-warning">@Model.Error</div>
+}
+else if (Model.Summary is { } s)
+{
+    <div class="row g-3">
+        <div class="col-sm-4">
+            <div class="card"><div class="card-body">
+                <div class="text-muted">รายการยาที่ใช้งาน</div>
+                <div class="fs-3">@s.ActiveItemCount.ToString("N0")</div>
+            </div></div>
+        </div>
+        <div class="col-sm-4">
+            <div class="card"><div class="card-body">
+                <div class="text-muted">ปริมาณคงคลังรวม (หน่วยจ่าย)</div>
+                <div class="fs-3">@s.TotalQtyOnHand.ToString("N0")</div>
+            </div></div>
+        </div>
+        <div class="col-sm-4">
+            <div class="card"><div class="card-body">
+                <div class="text-muted">มูลค่าคงคลังรวม (บาท)</div>
+                <div class="fs-3">@s.TotalValue.ToString("N2")</div>
+            </div></div>
+        </div>
+    </div>
+}
+
+<div class="mt-4">
+    <a class="btn btn-primary" asp-page="/Inventory/Status">สถานะคงคลัง</a>
+</div>

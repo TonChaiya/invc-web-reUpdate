@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Invc.Core/Invc.Core.csproj" />
+    <Project Path="src/Invc.Infrastructure/Invc.Infrastructure.csproj" />
+    <Project Path="src/Invc.Web/Invc.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Invc.IntegrationTests/Invc.IntegrationTests.csproj" />
+    <Project Path="tests/Invc.UnitTests/Invc.UnitTests.csproj" />
+  </Folder>
+</Solution>

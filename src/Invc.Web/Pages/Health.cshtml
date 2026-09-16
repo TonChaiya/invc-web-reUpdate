@@ -1,0 +1,21 @@
+@page
+@model HealthModel
+@{
+    ViewData["Title"] = "สถานะระบบ";
+}
+<h1 class="h3 mb-3">สถานะการเชื่อมต่อฐานข้อมูล</h1>
+<table class="table table-sm w-auto">
+    <tbody>
+        <tr><th>สถานะ</th><td>@(Model.Result.IsHealthy ? "ปกติ (SELECT 1 สำเร็จ)" : "ล้มเหลว")</td></tr>
+        <tr><th>เซิร์ฟเวอร์</th><td>@Model.Result.ServerName</td></tr>
+        <tr><th>ฐานข้อมูล</th><td>@Model.Result.DatabaseName</td></tr>
+        <tr><th>บัญชีที่ใช้เชื่อมต่อ</th><td>@Model.Result.LoginName</td></tr>
+        <tr><th>SQL Server</th><td>@Model.Result.ProductVersion</td></tr>
+        <tr><th>เวลาตอบสนอง</th><td>@Model.Result.Elapsed.TotalMilliseconds.ToString("N0") ms</td></tr>
+        @if (Model.Result.Error is not null)
+        {
+            <tr><th>ข้อผิดพลาด</th><td class="text-danger">@Model.Result.Error</td></tr>
+        }
+    </tbody>
+</table>
+<p class="text-muted">การเชื่อมต่อทั้งหมดเป็นแบบอ่านอย่างเดียว (ApplicationIntent=ReadOnly)</p>
