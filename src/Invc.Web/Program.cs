@@ -1,8 +1,22 @@
 using System.Globalization;
 using Invc.Infrastructure;
+using Invc.Infrastructure.Data;
+using Invc.Web;
 using Microsoft.AspNetCore.Localization;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Fail fast on invalid deployment configuration (shape only — never opens a database connection, so a
+// temporary database outage cannot stop the application from starting).
+var configProblems = ProductionConfigurationValidator.Validate(
+    builder.Configuration[$"{InvDatabaseOptions.SectionName}:ConnectionString"],
+    builder.Configuration["AllowedHosts"],
+    builder.Environment.IsProduction());
+if (configProblems.Count > 0)
+{
+    throw new InvalidOperationException("Invalid configuration for environment '" + builder.Environment.EnvironmentName + "': "
+        + string.Join(" | ", configProblems));
+}
 
 // Read-only data access to the production INV database. There is deliberately no
 // EF Core, no migrations and no database initialisation anywhere in this application.
@@ -16,6 +30,8 @@ if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Error");
     app.UseHsts();
 }
+
+app.UseInvcSecurityHeaders();
 
 // Legacy pages render Thai text and Buddhist-era years; pin the culture so output does not
 // depend on the hosting server's regional settings.
@@ -36,3 +52,6 @@ app.MapRazorPages()
    .WithStaticAssets();
 
 app.Run();
+
+/// <summary>Marker for test hosting (WebApplicationFactory).</summary>
+public partial class Program;

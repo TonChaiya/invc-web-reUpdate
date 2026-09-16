@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Invc.Core\Invc.Core.csproj" />
     <ProjectReference Include="..\..\src\Invc.Infrastructure\Invc.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Invc.Web\Invc.Web.csproj" />
   </ItemGroup>
 
 </Project>

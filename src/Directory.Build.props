@@ -1,0 +1,7 @@
+<Project>
+  <!-- Release builds ship without developer symbols; stack traces are never rendered to users regardless. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+  </PropertyGroup>
+</Project>

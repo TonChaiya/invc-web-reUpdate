@@ -9,6 +9,18 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Release packages are framework-dependent (IIS host supplies the .NET 10 Hosting Bundle). -->
+    <SelfContained>false</SelfContained>
+    <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Developer-only defaults (Windows-auth connection to the local instance) never enter a release package. -->
+    <Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Invc.UnitTests" />
+  </ItemGroup>
 
 </Project>

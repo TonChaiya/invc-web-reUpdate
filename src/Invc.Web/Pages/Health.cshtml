@@ -2,20 +2,32 @@
 @model HealthModel
 @{
     ViewData["Title"] = "สถานะระบบ";
+    var v = Model.View;
 }
-<h1 class="h3 mb-3">สถานะการเชื่อมต่อฐานข้อมูล</h1>
-<table class="table table-sm w-auto">
+<div class="page-header">
+    <h1 class="h3 mb-0">สถานะระบบ <span class="page-subtitle">System Status</span></h1>
+</div>
+<table class="table table-sm w-auto inv-table">
+    <caption class="visually-hidden">สถานะการเชื่อมต่อฐานข้อมูล</caption>
     <tbody>
-        <tr><th>สถานะ</th><td>@(Model.Result.IsHealthy ? "ปกติ (SELECT 1 สำเร็จ)" : "ล้มเหลว")</td></tr>
-        <tr><th>เซิร์ฟเวอร์</th><td>@Model.Result.ServerName</td></tr>
-        <tr><th>ฐานข้อมูล</th><td>@Model.Result.DatabaseName</td></tr>
-        <tr><th>บัญชีที่ใช้เชื่อมต่อ</th><td>@Model.Result.LoginName</td></tr>
-        <tr><th>SQL Server</th><td>@Model.Result.ProductVersion</td></tr>
-        <tr><th>เวลาตอบสนอง</th><td>@Model.Result.Elapsed.TotalMilliseconds.ToString("N0") ms</td></tr>
-        @if (Model.Result.Error is not null)
+        <tr><th scope="row">สถานะฐานข้อมูล</th>
+            <td>
+                <span class="status-dot @(v.IsHealthy ? "status-dot-ok" : "status-dot-bad")" aria-hidden="true"></span>
+                <span class="@(v.IsHealthy ? "text-success" : "text-danger")">@v.StatusText</span>
+            </td></tr>
+        <tr><th scope="row">เวลาตอบสนอง</th><td>@v.Elapsed.TotalMilliseconds.ToString("N0") ms</td></tr>
+        <tr><th scope="row">แอปพลิเคชัน</th><td>@v.ApplicationName · @v.EnvironmentName</td></tr>
+        @if (v.ShowTechnicalDetails)
         {
-            <tr><th>ข้อผิดพลาด</th><td class="text-danger">@Model.Result.Error</td></tr>
+            <tr><th scope="row">เซิร์ฟเวอร์</th><td>@v.ServerName</td></tr>
+            <tr><th scope="row">ฐานข้อมูล</th><td>@v.DatabaseName</td></tr>
+            <tr><th scope="row">บัญชีที่ใช้เชื่อมต่อ</th><td>@v.LoginName</td></tr>
+            <tr><th scope="row">SQL Server</th><td>@v.ProductVersion</td></tr>
+        }
+        @if (v.Error is not null)
+        {
+            <tr><th scope="row">ข้อผิดพลาด</th><td class="text-danger">@v.Error</td></tr>
         }
     </tbody>
 </table>
-<p class="text-muted">การเชื่อมต่อทั้งหมดเป็นแบบอ่านอย่างเดียว (ApplicationIntent=ReadOnly)</p>
+<p class="text-muted small">การเชื่อมต่อทั้งหมดเป็นแบบอ่านอย่างเดียว (ApplicationIntent=ReadOnly)@(v.ShowTechnicalDetails ? " · รายละเอียดทางเทคนิคแสดงเฉพาะสภาพแวดล้อม Development" : "")</p>
