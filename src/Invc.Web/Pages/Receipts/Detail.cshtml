@@ -20,7 +20,7 @@
 }
 else if (Model.Receipt is { } receipt)
 {
-    <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">
+    <div class="page-header d-flex flex-wrap align-items-start justify-content-between gap-2">
         <div>
             <h1 class="h3 mb-0">ใบรับเข้า <span class="inv-code">@receipt.Header.ReceiveNo</span> <span class="text-muted fs-6 fw-normal">(ไม่อ้างอิงใบสั่งซื้อ)</span></h1>
             <p class="text-muted mb-0">@receipt.Header.TypeDisplayName · @receipt.Header.SourceDisplayName · @(receipt.Header.DateReceive?.ToString("d MMMM yyyy"))</p>

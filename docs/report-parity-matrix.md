@@ -60,6 +60,8 @@ Because the legacy Idiom-B pages cannot run, the baseline is the **legacy SQL ex
 
 ## D. Dashboard (default.asp + Dashboard.asp → new Dashboard)
 
+**Executed in Phase 6 (2026-09-16): D1 PASS · D2 PASS · D3 PASS (Phase 2 active definition standardised; all legacy definitions equal today) · D4 PASS · D5 PASS · D6 PASS · D7 PASS (no agreements → 'ไม่มีสัญญาคงเหลือ') · D8 PASS · D9 PASS · D10 PASS (interactive `?item=`, no hard-coded item) · C11 MEASURED (no completed milestone data) — see `docs/phase6-dashboard-parity.md`; automated in `DashboardParityTests`.**
+
 | # | Check | Legacy definition | Baseline |
 |---|---|---|---|
 | D1 | K open budget year | `BUDGET.year WHERE BudgetOpen='O'`, `SUM(money)` | 2569 / 3 000 000 |

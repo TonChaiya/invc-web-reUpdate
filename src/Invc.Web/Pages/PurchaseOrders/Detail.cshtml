@@ -20,7 +20,7 @@
 }
 else if (Model.Order is { } order)
 {
-    <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">
+    <div class="page-header d-flex flex-wrap align-items-start justify-content-between gap-2">
         <div>
             <h1 class="h3 mb-0">ใบสั่งซื้อ <span class="inv-code">@order.Header.DisplayNumber</span></h1>
             <p class="text-muted mb-0">@(order.Header.VendorName ?? "ไม่พบชื่อบริษัท") · @(order.Header.PoDate?.ToString("d MMMM yyyy"))</p>

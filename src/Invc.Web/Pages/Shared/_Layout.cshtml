@@ -1,3 +1,10 @@
+@{
+    var currentPage = ViewContext.RouteData.Values["page"] as string ?? string.Empty;
+    bool IsIn(string prefix) => currentPage.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+    bool IsHome = currentPage.Equals("/Index", StringComparison.OrdinalIgnoreCase);
+    string NavClass(bool active) => active ? "nav-link active" : "nav-link";
+    string? NavCurrent(bool active) => active ? "page" : null;
+}
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -10,35 +17,36 @@
 </head>
 <body>
     <header>
-        <nav class="navbar navbar-expand-sm navbar-light bg-white border-bottom box-shadow mb-3">
+        <nav class="navbar navbar-expand-lg app-navbar" aria-label="เมนูหลัก">
             <div class="container-fluid">
-                <a class="navbar-brand" asp-page="/Index">INVC</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse"
-                        aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+                <a class="navbar-brand" asp-page="/Index">INVC <span class="brand-sub">คลังเวชภัณฑ์</span></a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav"
+                        aria-controls="mainNav" aria-expanded="false" aria-label="เปิด/ปิดเมนู">
                     <span class="navbar-toggler-icon"></span>
                 </button>
-                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
-                        <li class="nav-item"><a class="nav-link text-dark" asp-page="/Index">หน้าหลัก</a></li>
-                        <li class="nav-item"><a class="nav-link text-dark" asp-page="/Inventory/Status">สถานะคงคลัง</a></li>
-                        <li class="nav-item"><a class="nav-link text-dark" asp-page="/Reorder/Index">คำแนะนำการสั่งซื้อ</a></li>
-                        <li class="nav-item"><a class="nav-link text-dark" asp-page="/PurchaseOrders/Index">ใบสั่งซื้อ</a></li>
-                        <li class="nav-item"><a class="nav-link text-dark" asp-page="/Receipts/Index">รับเข้าอื่น / CUP</a></li>
-                        <li class="nav-item"><a class="nav-link text-dark" asp-page="/Health">สถานะระบบ</a></li>
+                <div class="collapse navbar-collapse" id="mainNav">
+                    <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                        <li class="nav-item"><a class="@NavClass(IsHome)" aria-current="@NavCurrent(IsHome)" asp-page="/Index">แดชบอร์ด</a></li>
+                        <li class="nav-item"><a class="@NavClass(IsIn("/Inventory/"))" aria-current="@NavCurrent(IsIn("/Inventory/"))" asp-page="/Inventory/Status">สถานะคงคลัง</a></li>
+                        <li class="nav-item"><a class="@NavClass(IsIn("/Reorder/"))" aria-current="@NavCurrent(IsIn("/Reorder/"))" asp-page="/Reorder/Index">คำแนะนำการสั่งซื้อ</a></li>
+                        <li class="nav-item"><a class="@NavClass(IsIn("/PurchaseOrders/"))" aria-current="@NavCurrent(IsIn("/PurchaseOrders/"))" asp-page="/PurchaseOrders/Index">ใบสั่งซื้อ</a></li>
+                        <li class="nav-item"><a class="@NavClass(IsIn("/Receipts/"))" aria-current="@NavCurrent(IsIn("/Receipts/"))" asp-page="/Receipts/Index">รับเข้าอื่น / CUP</a></li>
+                        <li class="nav-item"><a class="@NavClass(IsIn("/Health"))" aria-current="@NavCurrent(IsIn("/Health"))" asp-page="/Health">สถานะระบบ</a></li>
                     </ul>
                     @if (ViewData["HideNavSearch"] is not true)
                     {
-                    <form class="d-flex" method="get" asp-page="/Inventory/Status" role="search">
-                        <input class="form-control me-2" type="search" name="q" maxlength="@Invc.Core.Inventory.SearchKeyword.MaxLength"
-                               placeholder="รหัสยา / ชื่อยา / ส่วนประกอบ" aria-label="ค้นหา" />
-                        <button class="btn btn-outline-primary" type="submit">ค้นหา</button>
+                    <form class="d-flex" method="get" asp-page="/Inventory/Status" role="search" aria-label="ค้นหาคงคลัง">
+                        <label class="visually-hidden" for="navq">ค้นหารายการในคลัง</label>
+                        <input class="form-control form-control-sm me-2" type="search" id="navq" name="q" maxlength="@Invc.Core.Inventory.SearchKeyword.MaxLength"
+                               placeholder="ค้นหาคงคลัง: รหัส / ชื่อยา" />
+                        <button class="btn btn-sm btn-outline-primary" type="submit">ค้นหา</button>
                     </form>
                     }
                 </div>
             </div>
         </nav>
     </header>
-    <div class="container-fluid">
+    <div class="container-fluid app-main">
         <main role="main" class="pb-3">
             @RenderBody()
         </main>

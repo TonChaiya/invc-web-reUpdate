@@ -1,67 +1,131 @@
-html {
-  font-size: 14px;
+/* ==========================================================================
+   INVC Web — application visual system (Bootstrap 5 primitives + small set of reusable classes)
+   Colour semantics: red = actionable/urgent, yellow = warning, green = healthy/complete, blue/neutral = information.
+   Never rely on colour alone: every state also carries a text label.
+   ========================================================================== */
+
+:root {
+  --app-border: #dee2e6;
+  --app-muted: #6c757d;
+  --app-surface: #ffffff;
+  --app-bg: #f6f8fa;
+  --app-primary: #0d6efd;
+  --app-danger: #dc3545;
+  --app-warning: #f0ad00;
+  --app-success: #198754;
+  --app-info: #0aa2c0;
 }
 
-@media (min-width: 768px) {
-  html {
-    font-size: 16px;
-  }
+html { font-size: 14px; position: relative; min-height: 100%; }
+@media (min-width: 768px) { html { font-size: 16px; } }
+body { margin-bottom: 60px; background: var(--app-bg); }
+.app-main { padding-top: .75rem; }
+
+/* ---- Focus visibility (keyboard) ---- */
+a:focus-visible, .btn:focus-visible, .form-control:focus-visible, .form-select:focus-visible, .nav-link:focus-visible {
+  outline: 3px solid rgba(13, 110, 253, .45); outline-offset: 2px; box-shadow: none;
 }
 
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
-}
+/* ---- Navigation ---- */
+.app-navbar { background: var(--app-surface); border-bottom: 1px solid var(--app-border); margin-bottom: .5rem; }
+.app-navbar .navbar-brand { font-weight: 600; }
+.app-navbar .brand-sub { font-weight: 400; color: var(--app-muted); font-size: .85rem; }
+.app-navbar .nav-link { color: #333; padding: .5rem .75rem; border-radius: .375rem; }
+.app-navbar .nav-link:hover { background: #f1f3f5; }
+.app-navbar .nav-link.active { background: #e7f1ff; color: var(--app-primary); font-weight: 600; }
+@media (max-width: 991.98px) { .app-navbar .navbar-nav { padding-bottom: .5rem; } .app-navbar form { width: 100%; } .app-navbar form .form-control { flex: 1 1 auto; } }
 
-html {
-  position: relative;
-  min-height: 100%;
-}
+/* ---- Page & section headers ---- */
+.page-header { margin-bottom: 1rem; }
+.page-header h1 { line-height: 1.2; }
+.page-subtitle { color: var(--app-muted); font-size: .9rem; font-weight: 400; }
+.section-header { font-size: 1rem; font-weight: 600; color: #333; margin: 0 0 .5rem; padding-bottom: .25rem; border-bottom: 1px solid var(--app-border); }
+.section-note { font-weight: 400; color: var(--app-muted); font-size: .85rem; margin-left: .5rem; }
 
-body {
-  margin-bottom: 60px;
+/* ---- Metric cards ---- */
+.metric-card {
+  display: flex; flex-direction: column; gap: .15rem; height: 100%; padding: .75rem 1rem;
+  background: var(--app-surface); border: 1px solid var(--app-border); border-left: 4px solid var(--app-border);
+  border-radius: .5rem; color: inherit; text-decoration: none;
 }
+a.metric-card:hover { border-color: var(--app-primary); box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+.metric-label { font-size: .85rem; color: var(--app-muted); }
+.metric-value { font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.metric-value small { font-size: .85rem; font-weight: 400; color: var(--app-muted); }
+.metric-foot { font-size: .8rem; color: var(--app-muted); }
+.metric-na { color: var(--app-muted); font-size: 1.1rem; font-weight: 500; }
+.metric-primary { border-left-color: var(--app-primary); }
+.metric-info { border-left-color: var(--app-info); }
+.metric-danger { border-left-color: var(--app-danger); }
+.metric-danger .metric-value { color: var(--app-danger); }
+.metric-warning { border-left-color: var(--app-warning); }
+.metric-success { border-left-color: var(--app-success); }
+.metric-unavailable { border-style: dashed; background: #fbfbfb; }
+.metric-list { list-style: none; margin: .35rem 0 0; padding: 0; font-size: .8rem; }
+.metric-list li { display: flex; justify-content: space-between; gap: .5rem; border-top: 1px dashed #eee; padding: .15rem 0; }
+.metric-list li span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
 
-.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
-  color: var(--bs-secondary-color);
-  text-align: end;
-}
+/* ---- Status indicators ---- */
+.status-dot { display: inline-block; width: .6rem; height: .6rem; border-radius: 50%; vertical-align: middle; margin-right: .2rem; }
+.status-dot-ok { background: var(--app-success); }
+.status-dot-bad { background: var(--app-danger); }
+.reorder-badge { font-weight: 500; min-width: 7.5rem; }
+.reorder-card-active { box-shadow: 0 0 0 2px currentColor inset; }
 
-.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
-  text-align: start;
-}
-/* ---- INVC inventory pages ---- */
-.inv-search { min-width: 0; }
-.inv-search .form-control { min-width: 14rem; }
+/* ---- Composition bar (ED / NED) ---- */
+.composition-bar { display: flex; height: .6rem; border-radius: .3rem; overflow: hidden; margin: .3rem 0; background: #eee; }
+.composition-seg { display: block; min-width: 2px; }
+.comp-ed { background: var(--app-primary); }
+.comp-ned { background: var(--app-warning); }
+.comp-mes { background: var(--app-info); }
+.comp-ea { background: #6f42c1; }
+.comp-sam { background: #adb5bd; }
+.comp-x { background: #adb5bd; }
+
+/* ---- PO pipeline ---- */
+.pipeline { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .4rem; margin-top: .3rem; }
+.pipeline-step { display: flex; flex-direction: column; padding: .4rem .5rem; border: 1px solid var(--app-border); border-radius: .375rem; text-decoration: none; color: inherit; background: #fafbfc; min-width: 0; }
+.pipeline-step:hover { border-color: var(--app-primary); }
+.pipeline-label { font-size: .75rem; color: var(--app-muted); white-space: normal; }
+.pipeline-count { font-size: 1.15rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.pipeline-value { font-size: .75rem; color: var(--app-muted); font-variant-numeric: tabular-nums; }
+@media (max-width: 767.98px) { .pipeline { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ---- Item trend ---- */
+.trend-col { width: 40%; min-width: 8rem; }
+.trend-bar { display: block; height: .7rem; background: var(--app-primary); border-radius: .2rem; }
+
+/* ---- Empty / error states ---- */
+.empty-state { padding: .75rem 1rem; border: 1px dashed var(--app-border); border-radius: .5rem; color: var(--app-muted); background: var(--app-surface); }
+
+/* ---- Tables (shared) ---- */
 .inv-code { font-variant-numeric: tabular-nums; white-space: nowrap; }
-.inv-table { font-variant-numeric: tabular-nums; }
+.inv-table { font-variant-numeric: tabular-nums; background: var(--app-surface); }
 .inv-table td, .inv-table th { white-space: nowrap; }
 .inv-table td:nth-child(2) { white-space: normal; min-width: 16rem; }
 .inv-col-no { width: 3rem; }
-.inv-table-wrap { max-height: calc(100vh - 14rem); overflow: auto; }
-.inv-table thead th { position: sticky; top: 0; z-index: 1; box-shadow: inset 0 -1px 0 #dee2e6; }
+.inv-table-wrap { max-height: calc(100vh - 14rem); overflow: auto; background: var(--app-surface); }
+.inv-table thead th { position: sticky; top: 0; z-index: 1; box-shadow: inset 0 -1px 0 var(--app-border); }
+.inv-cards .card { border-left: 4px solid var(--app-border); }
 .inv-cards .card-body { padding-left: 1rem; padding-right: 1rem; }
-.inv-dl dt { font-weight: 500; color: #6c757d; }
-a:focus-visible, .btn:focus-visible, .form-control:focus-visible { outline: 3px solid #0d6efd66; outline-offset: 1px; }
+.inv-dl dt { font-weight: 500; color: var(--app-muted); }
+.inv-search { min-width: 0; }
+.inv-search .form-control { min-width: 14rem; }
 @media (max-width: 575.98px) {
   .inv-search { width: 100%; }
   .inv-search .form-control { min-width: 0; flex: 1 1 auto; }
   .inv-table-wrap { max-height: none; }
   .inv-table { font-size: .85rem; }
+  .metric-value { font-size: 1.25rem; }
 }
 
-/* ---- Reorder recommendations ---- */
-.reorder-card-active { box-shadow: 0 0 0 2px currentColor inset; }
-.reorder-badge { font-weight: 500; min-width: 7.5rem; }
+/* ---- Module-specific column widths ---- */
 .reorder-table td:nth-child(3) { white-space: normal; min-width: 14rem; }
 .reorder-table td:nth-child(2) { white-space: nowrap; min-width: 0; }
-
-/* ---- Purchase orders ---- */
 .po-table td.po-vendor { white-space: normal; min-width: 14rem; }
 .po-table td:nth-child(2) { white-space: nowrap; min-width: 0; }
 .po-lines td:nth-child(3) { white-space: normal; min-width: 14rem; }
 .po-lines td:nth-child(2) { white-space: nowrap; min-width: 0; }
-
-/* ---- Non-PO receipts ---- */
 .rc-table td.rc-source { white-space: normal; min-width: 12rem; }
 .rc-table td:nth-child(2) { white-space: nowrap; min-width: 0; }
 .rc-lines td:nth-child(3) { white-space: normal; min-width: 14rem; }
