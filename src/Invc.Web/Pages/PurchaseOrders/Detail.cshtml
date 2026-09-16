@@ -1,0 +1,31 @@
+@page "{realPo}"
+@model Invc.Web.Pages.PurchaseOrders.DetailModel
+@{
+    ViewData["Title"] = Model.Order is null ? "ใบสั่งซื้อ" : $"ใบสั่งซื้อ {Model.Order.Header.DisplayNumber}";
+    ViewData["HideNavSearch"] = true;
+}
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb mb-2">
+        <li class="breadcrumb-item"><a asp-page="/PurchaseOrders/Index" asp-route-fy="@Model.Order?.Header.FiscalYear">ใบสั่งซื้อ</a></li>
+        <li class="breadcrumb-item active" aria-current="page">@Model.RealPo</li>
+    </ol>
+</nav>
+
+@if (Model.HasError)
+{
+    <div class="alert alert-danger" role="alert">
+        ไม่สามารถอ่านข้อมูลใบสั่งซื้อจากฐานข้อมูล INV ได้ กรุณาตรวจสอบหน้า <a asp-page="/Health" class="alert-link">สถานะระบบ</a>
+    </div>
+}
+else if (Model.Order is { } order)
+{
+    <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">
+        <div>
+            <h1 class="h3 mb-0">ใบสั่งซื้อ <span class="inv-code">@order.Header.DisplayNumber</span></h1>
+            <p class="text-muted mb-0">@(order.Header.VendorName ?? "ไม่พบชื่อบริษัท") · @(order.Header.PoDate?.ToString("d MMMM yyyy"))</p>
+        </div>
+        <a class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener" asp-page="/PurchaseOrders/Print" asp-route-realPo="@order.Header.DisplayNumber">พิมพ์ / บันทึกเป็น PDF</a>
+    </div>
+    <partial name="_PurchaseOrderBody" model="order" />
+}

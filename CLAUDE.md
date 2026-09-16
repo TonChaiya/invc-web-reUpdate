@@ -25,9 +25,9 @@ same directory is kept as reference only.
 ```
 Invc.slnx
 src/Invc.Core            domain records, business rules (ported verbatim from legacy ASP), repository interfaces
-                         Inventory/ (status, detail, InventoryRules) · Reorder/ (ReorderItem, ReorderReport)
+                         Inventory/ (status, detail, InventoryRules) · Reorder/ (ReorderItem, ReorderReport) · PurchaseOrders/ (rules, report, detail)
 src/Invc.Infrastructure  Dapper + Microsoft.Data.SqlClient; ReadOnlySqlConnectionFactory, ReadOnlySql guard, SQL text
-src/Invc.Web             Razor Pages (th-TH culture). Pages: Index, Inventory/Status, Inventory/Detail/{code}, Reorder, Reorder/Print, Health
+src/Invc.Web             Razor Pages (th-TH culture). Pages: Index, Inventory/Status, Inventory/Detail/{code}, Reorder, Reorder/Print, PurchaseOrders, PurchaseOrders/Detail|Print/{realPo}, Health
 tests/Invc.UnitTests     offline tests (rules, SQL guard, connection-string policy)
 tests/Invc.IntegrationTests  read-only parity tests against INV; auto-skip when unreachable
 docs/                    Phase 0 audit + business rules + parity matrix + setup
@@ -40,11 +40,11 @@ legacy *.asp, Connections/, css/, js/…   legacy Classic ASP (Windows-874 encod
 - Explicit column lists (INV_MD has an `nvarchar(max)` column); no `SELECT *`.
 - Reproduce legacy query semantics first (see `docs/legacy-query-map.md`), then document any deliberate deviation in the SQL class comment.
 - `COMPANY.COMPANY_CODE` and the `DRUG_VN` key are not unique in production: use `OUTER APPLY (SELECT TOP 1 …)` for name lookups, never a plain LEFT JOIN that can multiply rows.
-- Legacy relationships have no FKs; model them in SQL (`MS_PO_C.PO_NO = MS_PO.PO_NO`, `MS_IVO.PO_NO = MS_PO.REAL_PO`, fiscal year = `LEFT(PO_NO,2)`).
+- Legacy relationships have no FKs; model them in SQL (`MS_PO_C.PO_NO = MS_PO.PO_NO`, `MS_IVO.PO_NO = MS_PO.REAL_PO`, `MS_IVO_C.RECEIVE_NO = MS_IVO.RECEIVE_NO`, fiscal year = first two digits of PO_NO passed as a `LIKE @PrefixPattern` parameter). PO status buckets live only in `PurchaseOrderRules`; never encode them in SQL. `OTH_IVO/OTH_IVOC` (non-PO receipts) are NOT purchase orders — keep them out of the PO module.
 - Reorder rules live only in `InventoryRules` (Core); SQL reads raw MIN_LEVEL/REORDER_QTY/MAX_LEVEL — never classify in SQL. `INV_Report_Purchase*.asp` is a reorder report, not a PO report; keep the "คำแนะนำการสั่งซื้อ" wording.
 - DB compatibility level is 100: no `TRY_CAST`, `STRING_AGG`, `OPENJSON`, `FORMAT`.
 
 ## Key docs
 `docs/data-source-map.md` (schema + evidence), `docs/inventory-business-rules.md`, `docs/purchase-order-business-rules.md`,
-`docs/report-parity-matrix.md`, `docs/phase2-inventory-parity.md` (A1–A10), `docs/phase3-reorder-parity.md` (B1–B6),
+`docs/report-parity-matrix.md`, `docs/phase2-inventory-parity.md` (A1–A10), `docs/phase3-reorder-parity.md` (B1–B6), `docs/phase4-purchase-order-parity.md` (C1–C9),
 `docs/phase0-security-and-data-access.md`, `docs/development-setup.md`.

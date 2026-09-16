@@ -1,0 +1,166 @@
+@using Invc.Core.PurchaseOrders
+@model PurchaseOrderDetail
+@{
+    var print = ViewData["Print"] is true;
+    var h = Model.Header;
+    var rec = Model.Reconciliation;
+    var today = DateTime.Today;
+    string D(DateTime? d) => d?.ToString("d MMM yyyy") ?? "–";
+}
+
+<div class="row g-2 mb-3 inv-cards">
+    <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body py-2">
+        <div class="text-muted small">มูลค่าใบสั่งซื้อ (บาท)</div>
+        <div class="fs-4 fw-semibold">@(h.TotalCost?.ToString("N2") ?? "–")</div>
+    </div></div></div>
+    <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body py-2">
+        <div class="text-muted small">จำนวนรายการ</div>
+        <div class="fs-4 fw-semibold">@(h.TotalItem?.ToString("N0") ?? "–")</div>
+    </div></div></div>
+    <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body py-2">
+        <div class="text-muted small">สถานะ</div>
+        <div class="fs-5 fw-semibold">@h.Status @(h.HasStatusName ? h.StatusName : "(ไม่พบชื่อสถานะ)")</div>
+    </div></div></div>
+    <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body py-2">
+        <div class="text-muted small">รับของครั้งแรก</div>
+        <div class="fs-5 fw-semibold">@D(h.FirstReceiveDate)</div>
+        @if (h.ProcessDays(today) is { } days) { <div class="small text-muted">@days วันนับถึงวันนี้</div> }
+    </div></div></div>
+</div>
+
+<div class="row">
+    <div class="col-lg-6">
+        <dl class="row mb-2 inv-dl">
+            <dt class="col-5 col-sm-4">เลขที่ PO</dt><dd class="col-7 col-sm-8 inv-code">@(h.RealPo ?? "–") <span class="text-muted">(PO_NO @h.PoNo)</span></dd>
+            <dt class="col-5 col-sm-4">วันที่สั่งซื้อ</dt><dd class="col-7 col-sm-8">@D(h.PoDate)</dd>
+            <dt class="col-5 col-sm-4">เลขที่เอกสาร</dt><dd class="col-7 col-sm-8">@(h.DocNo ?? "–")</dd>
+            <dt class="col-5 col-sm-4">บริษัท</dt><dd class="col-7 col-sm-8">@(h.VendorName ?? "ไม่พบชื่อบริษัท") <span class="text-muted">(@h.VendorCode)</span></dd>
+            <dt class="col-5 col-sm-4">งบประมาณ</dt><dd class="col-7 col-sm-8">@(h.BudgetName ?? "–") <span class="text-muted">(@h.BudgetType)</span></dd>
+            <dt class="col-5 col-sm-4">วิธีจัดซื้อ</dt><dd class="col-7 col-sm-8">@(h.BuyMethodName ?? "–") <span class="text-muted">(@h.BuyMethod)</span></dd>
+            <dt class="col-5 col-sm-4">บัญชียา</dt><dd class="col-7 col-sm-8">@(h.EdNedName ?? "–") <span class="text-muted">(@h.EdNed)</span></dd>
+            <dt class="col-5 col-sm-4">ปีงบประมาณ</dt><dd class="col-7 col-sm-8">@(h.FiscalYear?.ToString() ?? "–")</dd>
+        </dl>
+    </div>
+    <div class="col-lg-6">
+        <dl class="row mb-2 inv-dl">
+            <dt class="col-5 col-sm-4">เอกสารเข้า (BILLIN)</dt><dd class="col-7 col-sm-8">@D(h.BillIn)</dd>
+            <dt class="col-5 col-sm-4">เอกสารออก (BILLOUT)</dt><dd class="col-7 col-sm-8">@D(h.BillOut)</dd>
+            <dt class="col-5 col-sm-4">ส่งตั้งหนี้</dt><dd class="col-7 col-sm-8">@D(h.BillOutAcc)</dd>
+            <dt class="col-5 col-sm-4">ส่งเอกสารการเงิน</dt><dd class="col-7 col-sm-8">@D(h.BillOutFin)</dd>
+            <dt class="col-5 col-sm-4">เลขที่ขออนุมัติ</dt><dd class="col-7 col-sm-8">@(string.IsNullOrWhiteSpace(h.ApproveNoFin) ? "–" : h.ApproveNoFin.Trim())</dd>
+            <dt class="col-5 col-sm-4">ตัดจ่าย</dt><dd class="col-7 col-sm-8">@D(h.BillPayFin)</dd>
+            <dt class="col-5 col-sm-4">ปิดบัญชี</dt><dd class="col-7 col-sm-8">@D(h.BillEndAcc)</dd>
+            <dt class="col-5 col-sm-4">สิ้นสุด (BILLEND)</dt><dd class="col-7 col-sm-8">@D(h.BillEnd)</dd>
+        </dl>
+    </div>
+</div>
+
+<h2 class="h5 d-flex flex-wrap align-items-center gap-2 mt-2">
+    รายการสั่งซื้อ
+    <span class="badge text-bg-light border">@Model.Lines.Count รายการ</span>
+    @if (Model.Lines.Count > 0)
+    {
+        if (rec.IsConsistent) { <span class="badge text-bg-success">ยอดรายการตรงกับหัวใบสั่งซื้อ</span> }
+        else { <span class="badge text-bg-warning text-dark">ยอดรายการไม่ตรงกับหัวใบสั่งซื้อ</span> }
+    }
+</h2>
+@if (Model.Lines.Count == 0)
+{
+    <div class="alert alert-secondary" role="status">ไม่พบรายการสินค้าของใบสั่งซื้อนี้ (MS_PO_C)</div>
+}
+else
+{
+    <div class="@(print ? "" : "table-responsive")">
+        <table class="table table-sm align-middle inv-table po-lines @(print ? "table-bordered" : "table-striped")">
+            <thead class="table-light"><tr>
+                <th scope="col" class="text-end inv-col-no">#</th>
+                <th scope="col">รหัส</th>
+                <th scope="col">รายการ</th>
+                <th scope="col" class="text-end">จำนวน (หน่วยจ่าย)</th>
+                <th scope="col" class="text-end">บรรจุ</th>
+                <th scope="col" class="text-end">จำนวน (แพ็ค)</th>
+                <th scope="col">หน่วยสั่ง</th>
+                <th scope="col" class="text-end">ราคา/แพ็ค</th>
+                <th scope="col" class="text-end">มูลค่า</th>
+                <th scope="col" class="text-end">แถม</th>
+                <th scope="col">หมายเหตุ</th>
+            </tr></thead>
+            <tbody>
+            @{ var n = 0; }
+            @foreach (var l in Model.Lines)
+            {
+                n++;
+                <tr>
+                    <td class="text-end text-muted">@n</td>
+                    <td class="inv-code">
+                        @if (print) { @l.WorkingCode } else { <a asp-page="/Inventory/Detail" asp-route-workingCode="@l.WorkingCode">@l.WorkingCode</a> }
+                    </td>
+                    <td>@(l.DrugName ?? l.DrugPo)@(l.DrugName is not null && l.DrugPo is not null && l.DrugPo != l.DrugName ? $" — {l.DrugPo}" : "")</td>
+                    <td class="text-end">@(l.QtyOrder?.ToString("N0"))</td>
+                    <td class="text-end">@(l.PackRatio1?.ToString("N0"))</td>
+                    <td class="text-end">@(l.PacksOrdered?.ToString("N2") ?? "–")</td>
+                    <td>@l.PoUnit</td>
+                    <td class="text-end">@(l.BuyUnitCost?.ToString("N2"))</td>
+                    <td class="text-end">@(l.BuyValue?.ToString("N2"))</td>
+                    <td class="text-end">@(l.QtyFree is { } f && f != 0 ? $"{f:N0}{(l.FreePacks is { } fp ? $" ({fp:N2} แพ็ค)" : "")}" : "")</td>
+                    <td class="small">@l.Note</td>
+                </tr>
+            }
+            </tbody>
+            <tfoot class="table-light fw-semibold">
+                <tr><td colspan="8" class="text-end">รวมรายการ (SUM BUY_VALUE)</td><td class="text-end">@rec.LineTotal.ToString("N2")</td><td colspan="2"></td></tr>
+                <tr><td colspan="8" class="text-end">หัวใบสั่งซื้อ (TOTAL_COST / TOTAL_ITEM)</td><td class="text-end">@(rec.HeaderTotal?.ToString("N2") ?? "–")</td><td colspan="2">@(rec.HeaderItemCount?.ToString("N0") ?? "–") รายการ</td></tr>
+                @if (!rec.IsConsistent)
+                {
+                    <tr class="table-warning"><td colspan="8" class="text-end">ผลต่าง</td><td class="text-end">@rec.TotalDelta.ToString("N2")</td><td colspan="2">@(rec.ItemCountMatches ? "" : $"จำนวนรายการ {rec.HeaderItemCount} ≠ {rec.LineCount}")</td></tr>
+                }
+            </tfoot>
+        </table>
+    </div>
+}
+
+<h2 class="h5 d-flex flex-wrap align-items-center gap-2 mt-3">
+    การรับของ (MS_IVO)
+    <span class="badge text-bg-light border">@Model.Receipts.Count ครั้ง</span>
+</h2>
+@if (Model.Receipts.Count == 0)
+{
+    <div class="alert alert-secondary" role="status">ยังไม่มีข้อมูลการรับของสำหรับใบสั่งซื้อนี้</div>
+}
+else
+{
+    foreach (var rcpt in Model.Receipts)
+    {
+        <div class="card mb-2">
+            <div class="card-header py-1 small">
+                ใบรับ <strong class="inv-code">@rcpt.ReceiveNo</strong> · ใบแจ้งหนี้ @(rcpt.InvoiceNo ?? "–") ลงวันที่ @D(rcpt.InvoiceDate)
+                · รับของ @D(rcpt.DateReceive) · มูลค่า @(rcpt.TotalCost?.ToString("N2") ?? "–") · บัญชี @D(rcpt.DateAcc)
+            </div>
+            @if (rcpt.Lines.Count > 0)
+            {
+                <div class="@(print ? "" : "table-responsive")">
+                    <table class="table table-sm mb-0 inv-table @(print ? "table-bordered" : "")">
+                        <thead class="table-light"><tr>
+                            <th scope="col">รหัส</th><th scope="col">รายการ</th>
+                            <th scope="col" class="text-end">จำนวน</th><th scope="col" class="text-end">บรรจุ</th><th scope="col" class="text-end">แพ็ค</th>
+                            <th scope="col" class="text-end">ราคา</th><th scope="col" class="text-end">แถม</th>
+                            <th scope="col">วันหมดอายุ</th><th scope="col">เลขที่ผลิต</th><th scope="col">ที่เก็บ</th>
+                        </tr></thead>
+                        <tbody>
+                        @foreach (var rl in rcpt.Lines)
+                        {
+                            <tr>
+                                <td class="inv-code">@rl.WorkingCode</td><td>@rl.DrugName</td>
+                                <td class="text-end">@(rl.QtyOrder?.ToString("N0"))</td><td class="text-end">@(rl.PackRatio1?.ToString("N0"))</td>
+                                <td class="text-end">@(rl.PacksReceived?.ToString("N2") ?? "–")</td>
+                                <td class="text-end">@(rl.BuyUnitCost?.ToString("N2"))</td><td class="text-end">@(rl.QtyFree?.ToString("N0"))</td>
+                                <td>@D(rl.ExpiredDate1)</td><td>@rl.LotNo</td><td>@rl.Location1</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    }
+}

@@ -5,6 +5,8 @@ using Invc.Infrastructure.Diagnostics;
 using Invc.Infrastructure.Inventory;
 using Invc.Core.Reorder;
 using Invc.Infrastructure.Reorder;
+using Invc.Core.PurchaseOrders;
+using Invc.Infrastructure.PurchaseOrders;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -22,6 +24,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ISqlConnectionFactory, ReadOnlySqlConnectionFactory>();
         services.AddScoped<IInventoryRepository, InventoryRepository>();
         services.AddScoped<IReorderRepository, ReorderRepository>();
+        services.AddScoped<IPurchaseOrderRepository, PurchaseOrderRepository>();
         services.AddScoped<IDatabaseHealth, DatabaseHealth>();
         return services;
     }

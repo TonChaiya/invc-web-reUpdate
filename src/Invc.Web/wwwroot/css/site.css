@@ -54,3 +54,9 @@ a:focus-visible, .btn:focus-visible, .form-control:focus-visible { outline: 3px 
 .reorder-badge { font-weight: 500; min-width: 7.5rem; }
 .reorder-table td:nth-child(3) { white-space: normal; min-width: 14rem; }
 .reorder-table td:nth-child(2) { white-space: nowrap; min-width: 0; }
+
+/* ---- Purchase orders ---- */
+.po-table td.po-vendor { white-space: normal; min-width: 14rem; }
+.po-table td:nth-child(2) { white-space: nowrap; min-width: 0; }
+.po-lines td:nth-child(3) { white-space: normal; min-width: 14rem; }
+.po-lines td:nth-child(2) { white-space: nowrap; min-width: 0; }

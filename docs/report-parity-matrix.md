@@ -42,6 +42,8 @@ Legend: R = row count, Q = quantity total, V = value total, S = sample-record co
 
 Because the legacy Idiom-B pages cannot run, the baseline is the **legacy SQL executed directly**.
 
+**Executed in Phase 4 (2026-09-16): C1–C9 PASS, C10 DEFERRED (Receipts phase), C11 MEASURED / DEFERRED TO DASHBOARD — see `docs/phase4-purchase-order-parity.md`; automated in `PurchaseOrderParityTests`.**
+
 | # | Check | Legacy definition | Baseline |
 |---|---|---|---|
 | C1 | R PO per FY | `COUNT(*) FROM MS_PO WHERE LEFT(PO_NO,2)='69' AND STATUS NOT IN ('0','C')` | 1 |

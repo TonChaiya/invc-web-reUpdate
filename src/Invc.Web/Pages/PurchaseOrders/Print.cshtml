@@ -1,0 +1,36 @@
+@page "{realPo}"
+@model Invc.Web.Pages.PurchaseOrders.PrintModel
+@{
+    Layout = null;
+    ViewData["Print"] = true;
+    var number = Model.Order?.Header.DisplayNumber ?? Model.RealPo;
+}
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ใบสั่งซื้อ @number - INVC</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/print.css" asp-append-version="true" />
+</head>
+<body class="print-body">
+    <div class="no-print d-flex gap-2 align-items-center mb-3">
+        <button type="button" class="btn btn-primary" onclick="window.print()">พิมพ์ / บันทึกเป็น PDF</button>
+        <a class="btn btn-outline-secondary" asp-page="/PurchaseOrders/Detail" asp-route-realPo="@number">กลับหน้าใบสั่งซื้อ</a>
+    </div>
+    <header class="print-header">
+        <h1 class="h4 mb-1">ใบสั่งซื้อ @number</h1>
+        <div class="print-meta">คลังเวชภัณฑ์หลัก · พิมพ์เมื่อ @DateTime.Now.ToString("d MMMM yyyy HH:mm")</div>
+    </header>
+    @if (Model.HasError)
+    {
+        <div class="alert alert-danger" role="alert">ไม่สามารถอ่านข้อมูลใบสั่งซื้อจากฐานข้อมูล INV ได้</div>
+    }
+    else if (Model.Order is { } order)
+    {
+        <partial name="_PurchaseOrderBody" model="order" />
+    }
+</body>
+</html>
