@@ -3,9 +3,13 @@
 # Usage: .\scripts\test-release-artifact.ps1 [-PublishPath <project>\.work\release\publish]
 param([string]$PublishPath)
 $ErrorActionPreference = 'Stop'
-$root = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot 'project-path-guard.ps1')
+$root = Get-NormalizedProjectPath (Split-Path -Parent $PSScriptRoot)
 if (-not $PublishPath) { $PublishPath = Join-Path $root '.work\release\publish' }
-if (-not (Test-Path $PublishPath)) { Write-Host "publish path not found: $PublishPath" -ForegroundColor Red; exit 1 }
+# Release-pipeline invariant: only a package inside this project is ever audited (exact-boundary check, reparse points refused).
+Assert-PathInsideProject -Candidate $PublishPath -ProjectRoot $root -Purpose 'publish path' -RequireDescendant
+$PublishPath = Get-NormalizedProjectPath $PublishPath
+if (-not (Test-Path -LiteralPath $PublishPath)) { Write-Host "publish path not found: $PublishPath" -ForegroundColor Red; exit 1 }
 
 $failures = New-Object System.Collections.Generic.List[string]
 $files = Get-ChildItem -Recurse -File $PublishPath

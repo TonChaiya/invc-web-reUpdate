@@ -21,14 +21,14 @@ No step has been run against this machine. The application reads INV read-only; 
 
 ## B. Package preparation (inside the project — the only part this project performs)
 1. `scripts\verify.ps1` — restore, build (Release), all tests, `git diff --check`.
-2. `scripts\publish-iis.ps1` — framework-dependent Release publish to `.work\release\publish` (refuses any path outside the project).
-3. `scripts\test-release-artifact.ps1` — fails on legacy ASP, source, symbols, dev config, shipped secrets, wrong web.config.
-4. `scripts\new-release-manifest.ps1` — SHA-256 manifest with commit SHA (keep alongside the package for traceability).
+2. `scripts/publish-iis.ps1` — framework-dependent Release publish to `.work/release/publish` (refuses any path outside the project).
+3. `scripts/test-release-artifact.ps1` — fails on legacy ASP, source, symbols, dev config, shipped secrets, wrong web.config.
+4. `scripts/new-release-manifest.ps1` — SHA-256 manifest with commit SHA (keep alongside the package for traceability).
 5. Published Production-mode smoke and negative smoke (see `docs/phase7-release-readiness.md` §6–7).
 
 ## C. Future deployment steps (high level — DO NOT RUN without approval)
 1. Confirm every prerequisite in §A; record the manifest commit SHA of the package to be deployed.
-2. Copy the audited `.work\release\publish` contents to a **new versioned folder** on the host (e.g. `…\InvcWeb\releases\<sha>`); never overwrite the running folder.
+2. Copy the audited `.work/release/publish` contents to a **new versioned folder** on the host (e.g. `…\InvcWeb\releases\<sha>`); never overwrite the running folder.
 3. Create/verify the IIS application pool: **No Managed Code**, identity per §A.4/§A.6, `Start Mode` as required.
 4. Create the IIS site/application pointing at the versioned folder (or repoint the physical path of an existing site).
 5. Set `ASPNETCORE_ENVIRONMENT=Production`, `AllowedHosts=<hosts>`, `InvDatabase__ConnectionString=<read-only identity>` as IIS environment variables (app pool / site level).

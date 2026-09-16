@@ -25,8 +25,8 @@ Deployment **must** supply, outside the repository (IIS `environmentVariables` o
 `appsettings.Development.json` stays in the repository for developers and is excluded from publish (`CopyToPublishDirectory=Never`).
 
 ## 3. Publish isolation and artifact audit (`scripts/publish-iis.ps1` → `scripts/test-release-artifact.ps1`)
-Package: `dotnet publish src/Invc.Web/Invc.Web.csproj -c Release` (framework-dependent, portable) → `.work\release\publish` (git-ignored);
-the script **refuses** any output path outside `C:\INVC\Web` (demonstrated with `C:\inetpub\wwwroot\invc` → exit 2, nothing created; unit-tested).
+Package: `dotnet publish src/Invc.Web/Invc.Web.csproj -c Release` (framework-dependent, portable) → `.work/release/publish` (git-ignored);
+the script **refuses** any output path outside `C:/INVC/Web` (demonstrated with `C:/inetpub/wwwroot/invc` → exit 2, nothing created; unit-tested). The containment rule is shared and specified in section 3a.
 Baseline (before Phase 7) shipped `appsettings.Development.json` and three `.pdb` files; the Phase 7 package (236 files) contains
 **none** of: `*.asp *.mdb *.accdb *.rar *.zip *.7z *.cs *.csproj *.sln *.slnx *.pdb *.mno *.inc appsettings.Development.json`,
 nor the `Connections/`, `_mmServerScripts/`, `_notes/`, `tests/`, `docs/`, `scripts/`, `Login_v4/` directories.
@@ -34,11 +34,29 @@ Required files present: `Invc.Web.dll`, `Invc.Core.dll`, `Invc.Infrastructure.dl
 `web.config`, `Invc.Web.runtimeconfig.json`, `wwwroot/css/site.css`, `wwwroot/css/print.css`, Bootstrap CSS.
 **Classic ASP exclusion = RELEASE GATE** (audit fails on any `.asp` or `_mmServerScripts`).
 
+## 3a. Release write-path containment rule (`scripts/project-path-guard.ps1`, corrective pass after review)
+Every release script that creates, deletes or reads a package (`publish-iis.ps1`, `test-release-artifact.ps1`, `new-release-manifest.ps1`)
+dot-sources one shared helper and calls `Assert-PathInsideProject` **before** any `New-Item`, `Remove-Item`, `Set-Content` or `dotnet publish`:
+
+- **Exact normalized descendant check, not a string prefix.** Candidate and project root are normalised with `GetFullPath` (so `..`/`.` are
+  resolved first) and trailing separators are trimmed; the candidate is accepted only when it equals the root or starts with
+  `root + directory separator` (OrdinalIgnoreCase). Write targets additionally use `-RequireDescendant`, so the project root itself is refused.
+- **Prefix siblings are rejected.** `C:/INVC/Web-other`, `C:/INVC/Web2/publish` or `C:/INVC/Web-outside/release-manifest.json` merely
+  start with the root string; the previous manifest script accepted them (review finding) and they are now refused with exit 2.
+- **Reparse points below the workspace are rejected for write/delete.** Any existing junction or symbolic link in the candidate chain
+  strictly below the root causes refusal, so a write or delete can never be redirected outside the project. The check is repeated
+  after a parent directory is created and immediately before the final write.
+- **Nothing is created on refusal.** `-GuardOnly` (publish and manifest scripts) evaluates the rule and exits 0/2 without touching disk.
+
+Regression coverage: `tests/Invc.UnitTests/ReleasePathGuardTests.cs` (prefix collision, parent traversal, `C:/inetpub` and `C:/Windows`
+paths, valid descendants, root-is-not-descendant, junction under `.work/guard-tests` created and removed by the test, manifest refusal
+without file creation, publish/audit refusal). Allowed defaults remain `.work/release/publish` and `.work/release/manifest/release-manifest.json`.
+
 ## 4. Generated IIS web.config (reviewed, not deployed)
 ASP.NET Core hosting configuration only: `AspNetCoreModuleV2` handler, `processPath="dotnet" arguments=".\Invc.Web.dll"`, in-process,
 stdout logging disabled. No `httpErrors`, no Classic ASP handlers, no `_mmServerScripts`, no credentials (audit-checked).
 
-## 5. Release manifest (`scripts/new-release-manifest.ps1` → `.work\release\manifest\release-manifest.json`, not committed)
+## 5. Release manifest (`scripts/new-release-manifest.ps1` → `.work/release/manifest/release-manifest.json`, not committed)
 Records application, commit SHA, working-tree dirty flag, UTC/local timestamps, target framework (`net10.0`), runtime frameworks,
 publish mode, file count/bytes and SHA-256 per file — a deployed package can be matched back to an exact commit.
 
@@ -96,5 +114,6 @@ The runbook for the future deployment and rollback is `docs/iis-deployment-runbo
 
 ## 14. Tooling added
 `scripts/dev.ps1`, `scripts/verify.ps1` (`-SkipIntegration` optional), `scripts/publish-iis.ps1` (package only, path guard, `-GuardOnly`),
-`scripts/test-release-artifact.ps1`, `scripts/new-release-manifest.ps1`. Pipeline order: verify → publish → audit → Production smoke →
+`scripts/test-release-artifact.ps1` (publish path must be inside the project), `scripts/new-release-manifest.ps1` (both paths guarded, `-GuardOnly`),
+`scripts/project-path-guard.ps1` (shared containment rule, section 3a). Pipeline order: verify → publish → audit → Production smoke →
 negative smoke → manifest → `git diff --check`.

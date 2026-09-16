@@ -29,12 +29,9 @@ Phase 1 safety report; they are not modified by this project afterwards.
 .\scripts\dotnet-local.ps1 test  Invc.slnx
 .\scripts\dev.ps1                       # run the site (Development) on http://127.0.0.1:5265
 .\scripts\verify.ps1                    # info, restore, build (Release), all tests, git diff --check
-.\scripts\publish-iis.ps1               # package only -> .work
-elease\publish (never deploys)
-.\scripts	est-release-artifact.ps1     # audit the package
-.\scripts
-ew-release-manifest.ps1      # SHA-256 manifest -> .work
-elease\manifest
+.\scripts\publish-iis.ps1               # package only -> .work/release/publish (never deploys)
+.\scripts\test-release-artifact.ps1     # audit the package
+.\scripts\new-release-manifest.ps1      # SHA-256 manifest -> .work/release/manifest
 ```
 HTTPS is not configured in development (no dev certificate is generated); use the http profile.
 

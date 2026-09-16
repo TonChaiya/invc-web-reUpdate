@@ -20,9 +20,7 @@ same directory is kept as reference only.
   - run:   `.\scripts\dotnet-local.ps1 run --project src\Invc.Web`
 - `global.json` pins SDK 10.0.401 (`rollForward: latestPatch`).
 - No `dotnet workload install`, no global tools.
-- Release tooling (package only, never deploys): `scripts\verify.ps1` → `scripts\publish-iis.ps1` (refuses output outside the project) → `scripts	est-release-artifact.ps1` → `scripts
-ew-release-manifest.ps1`; artifacts live in `.work
-elease\` (git-ignored). `scripts\dev.ps1` starts the site locally.
+- Release tooling (package only, never deploys): `scripts/verify.ps1` → `scripts/publish-iis.ps1` (refuses output outside the project) → `scripts/test-release-artifact.ps1` → `scripts/new-release-manifest.ps1`; all three dot-source `scripts/project-path-guard.ps1` (exact normalized-descendant check, reparse points refused); artifacts live in `.work/release/` (git-ignored). `scripts/dev.ps1` starts the site locally.
 
 ## Layout
 ```

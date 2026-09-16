@@ -1,7 +1,7 @@
 # Phase 7 plan — Release readiness + security hardening (package only, no deployment)
 
 Owner-approved. Base `f0427fd` (== origin/main, clean, 358 tests green). Boundaries: modify only `C:\INVC\Web`; INV strictly read-only;
-no IIS/inetpub/Windows/SQL Server/Access changes; no appcmd/msdeploy/IIS cmdlets; all artifacts under `.work\release\`.
+no IIS/inetpub/Windows/SQL Server/Access changes; no appcmd/msdeploy/IIS cmdlets; all artifacts under `.work/release/`.
 
 | # | Task | Output |
 |---|---|---|
@@ -13,7 +13,7 @@ no IIS/inetpub/Windows/SQL Server/Access changes; no appcmd/msdeploy/IIS cmdlets
 | 8–9 | Error page review (no details in Production, request id kept); `/Health` redaction in Production (status, elapsed, environment; 503 on failure) with Development details retained | Web + tests |
 | 10–11 | Security headers middleware (nosniff, Referrer-Policy, X-Frame-Options, Permissions-Policy); CSP documented as future; HTTPS/HSTS preserved and documented as IIS prerequisite | Web + tests |
 | 12–13 | Document authentication decision (none in app; owner decision) and DB identity blocker (never `sa`; no provisioning performed) | docs |
-| 14–16 | Release `.pdb` exclusion; verify generated ASP.NET Core `web.config`; artifacts under `.work\release\{publish,manifest,smoke,logs}` (git-ignored) | csproj + scripts |
+| 14–16 | Release `.pdb` exclusion; verify generated ASP.NET Core `web.config`; artifacts under `.work/release/{publish,manifest,smoke,logs}` (git-ignored) | csproj + scripts |
 | 17–21 | `scripts/dev.ps1`, `scripts/verify.ps1`, `scripts/publish-iis.ps1` (package-only, output-path guard), `scripts/test-release-artifact.ps1`, `scripts/new-release-manifest.ps1` | scripts + tests of guard logic |
 | 22–25 | Published Production smoke (AllowedHosts local, process-local env), negative smoke against a non-listening endpoint (503, no disclosure), functional checks (static, Thai, print CSS, env, no dev config, no `.asp`) | evidence in readiness doc |
 | 26–29 | New-app security source review; release-level read-only SQL assertion test; Release-mode dashboard performance recheck; logging review | tests + doc |
