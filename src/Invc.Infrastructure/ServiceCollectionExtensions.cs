@@ -3,6 +3,8 @@ using Invc.Core.Inventory;
 using Invc.Infrastructure.Data;
 using Invc.Infrastructure.Diagnostics;
 using Invc.Infrastructure.Inventory;
+using Invc.Core.Reorder;
+using Invc.Infrastructure.Reorder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -19,6 +21,7 @@ public static class ServiceCollectionExtensions
         services.Configure<InvDatabaseOptions>(configuration.GetSection(InvDatabaseOptions.SectionName));
         services.AddSingleton<ISqlConnectionFactory, ReadOnlySqlConnectionFactory>();
         services.AddScoped<IInventoryRepository, InventoryRepository>();
+        services.AddScoped<IReorderRepository, ReorderRepository>();
         services.AddScoped<IDatabaseHealth, DatabaseHealth>();
         return services;
     }

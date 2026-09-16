@@ -27,6 +27,8 @@ Legend: R = row count, Q = quantity total, V = value total, S = sample-record co
 
 ## B. Reorder recommendation (INV_Report_Purchase*.asp → new Reorder page)
 
+**Executed in Phase 3 (2026-09-16): B1–B6 PASS — see `docs/phase3-reorder-parity.md`; automated in `ReorderParityTests`.**
+
 | # | Check | Legacy definition | Baseline |
 |---|---|---|---|
 | B1 | R eligible | `NOUSE` null/'' AND `OUT_OF_LIST` null/'' | 267 |

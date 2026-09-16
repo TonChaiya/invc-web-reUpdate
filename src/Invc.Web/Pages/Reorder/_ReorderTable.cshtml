@@ -1,0 +1,77 @@
+@using Invc.Core.Inventory
+@using Invc.Core.Reorder
+@model ReorderReport
+@{
+    var print = ViewData["Print"] is true;
+}
+<div class="@(print ? "" : "table-responsive inv-table-wrap")">
+    <table class="table table-sm align-middle inv-table reorder-table @(print ? "table-bordered" : "table-striped table-hover")">
+        <caption class="visually-hidden">คำแนะนำการสั่งซื้อ สถานะ @Model.Filter.ThaiLabel()</caption>
+        <thead class="table-light">
+            <tr>
+                <th scope="col" class="text-end inv-col-no">#</th>
+                <th scope="col">รหัส</th>
+                <th scope="col">รายการ</th>
+                <th scope="col" class="text-end">คงคลัง</th>
+                <th scope="col" class="text-center">หน่วย</th>
+                <th scope="col" class="text-end">MIN</th>
+                <th scope="col" class="text-end">จุดสั่งซื้อ</th>
+                <th scope="col" class="text-end">MAX</th>
+                <th scope="col" class="text-end">แนะนำสั่ง</th>
+                <th scope="col" class="text-end">อัตราใช้/เดือน</th>
+                <th scope="col" class="text-end">เหลือใช้ (เดือน)</th>
+                <th scope="col" class="text-center">สถานะ</th>
+            </tr>
+        </thead>
+        <tbody>
+        @{ var n = 0; }
+        @foreach (var item in Model.Rows)
+        {
+            n++;
+            var badge = item.Status switch
+            {
+                ReorderStatus.Red => "text-bg-danger",
+                ReorderStatus.Yellow => "text-bg-warning text-dark",
+                _ => "text-bg-success",
+            };
+            var suggested = item.DisplaySuggestedQty();
+            <tr>
+                <td class="text-end text-muted">@n</td>
+                <td class="inv-code">@item.WorkingCode</td>
+                <td>
+                    @if (print)
+                    {
+                        @item.DrugName
+                    }
+                    else
+                    {
+                        <a asp-page="/Inventory/Detail" asp-route-workingCode="@item.WorkingCode">@item.DrugName</a>
+                    }
+                    @if (item.HasNoThresholds)
+                    {
+                        <span class="badge text-bg-light border text-muted ms-1" title="MIN_LEVEL และ MAX_LEVEL เป็น 0 หรือว่าง — ยังไม่ได้กำหนดในโปรแกรม Access">ไม่ได้กำหนด MIN/MAX</span>
+                    }
+                </td>
+                <td class="text-end">@((item.QtyOnHand ?? 0m).ToString("N0"))</td>
+                <td class="text-center">@item.SaleUnit</td>
+                <td class="text-end">@((item.MinLevel ?? 0m).ToString("N0"))</td>
+                <td class="text-end">@item.EffectiveReorderPoint.ToString("N0")</td>
+                <td class="text-end">@((item.MaxLevel ?? 0m).ToString("N0"))</td>
+                <td class="text-end @(item.Status == ReorderStatus.Red ? "fw-semibold" : "")">
+                    @if (suggested <= 0m && item.Status != ReorderStatus.Red)
+                    {
+                        <span class="text-muted" title="ค่าดิบตามสูตร: @item.SuggestedOrderQty.ToString("N0")">ไม่ต้องสั่ง</span>
+                    }
+                    else
+                    {
+                        @suggested.ToString("N0")
+                    }
+                </td>
+                <td class="text-end">@(item.RatePerMonth?.ToString("N0"))</td>
+                <td class="text-end">@item.MonthsOfStockDisplay</td>
+                <td class="text-center"><span class="badge @badge reorder-badge">@item.Status.ThaiLabel()</span></td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
