@@ -9,6 +9,8 @@ Legend: R = row count, Q = quantity total, V = value total, S = sample-record co
 
 ## A. Inventory status (INV_Status.asp → new Inventory page)
 
+**Executed in Phase 2 (2026-09-16): A1–A10 PASS, A11 measured only — see `docs/phase2-inventory-parity.md`; automated in `InventoryPhase2ParityTests`.**
+
 | # | Check | Legacy definition | Baseline (2026-09-16) |
 |---|---|---|---|
 | A1 | R active items | `SELECT COUNT(*) FROM INV_MD WHERE NOUSE IS NULL` | 267 |

@@ -64,10 +64,11 @@ DENY INSERT, UPDATE, DELETE, EXECUTE ON SCHEMA::dbo TO invc_web_ro;
 - `tests\Invc.UnitTests` — no database. Rules ported from legacy ASP, `ReadOnlySql` guard, connection-string policy, LIKE escaping.
 - `tests\Invc.IntegrationTests` — **read-only** against INV. Uses `INVC_TEST_CONNECTION` if set, otherwise the Windows-auth
   default with a 5 s connect timeout. When the server is unreachable every test is *skipped* (`Xunit.SkippableFact`).
-  They never create fixtures, seed, clean up, or open transactions. Included parity checks: A1 row count, A3 totals,
-  A8 keyword count, A9 ordering (see `docs/report-parity-matrix.md`).
+  They never create fixtures, seed, clean up, or open transactions. Included parity checks: A1–A10 (see
+  `docs/phase2-inventory-parity.md`); borrow-rule scenarios use table-value constructors (`VALUES`) so nothing is written.
 
 ## Git
-Repository root is `C:\INVC\Web`. `.gitignore` excludes `.work/`, build output, local secrets, and the legacy files that
-embed credentials or are archives (`Connections/*.asp`, `*.rar`, `*.zip`, `*.mdb`, `_mmServerScripts/`, `_notes/`).
+Repository root is `C:\INVC\Web` (remote `TonChaiya/invc-web-reUpdate`). `.gitignore` excludes `.work/`, build output and
+local secret files. The legacy Classic ASP baseline (including its `Connections/` files and archives) is tracked as it was in the
+original upload, by owner decision; `.gitattributes` stores text as LF and marks archives/images binary.
 Repository-local git config only; global git config is never changed.

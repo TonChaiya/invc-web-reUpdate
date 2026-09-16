@@ -62,6 +62,13 @@ public static class InventoryRules
     /// </summary>
     public static decimal SuggestedOrderQty(decimal? maxLevel, decimal? qtyOnHand)
         => Math.Ceiling((maxLevel ?? 0m) - (qtyOnHand ?? 0m));
+
+    /// <summary>
+    /// chkstock.asp lot table "คงเหลือ": QTY_ON_HAND / PACK_RATIO expressed in packs.
+    /// Returns null when PACK_RATIO is 0 or negative instead of dividing by zero.
+    /// </summary>
+    public static decimal? PacksOnHand(decimal qtyOnHand, decimal packRatio)
+        => packRatio <= 0m ? null : qtyOnHand / packRatio;
 }
 
 /// <summary>Reorder status bucket used by INV_Report_Purchase.asp (red/yellow/green).</summary>

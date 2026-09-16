@@ -26,7 +26,7 @@ same directory is kept as reference only.
 Invc.slnx
 src/Invc.Core            domain records, business rules (ported verbatim from legacy ASP), repository interfaces
 src/Invc.Infrastructure  Dapper + Microsoft.Data.SqlClient; ReadOnlySqlConnectionFactory, ReadOnlySql guard, SQL text
-src/Invc.Web             Razor Pages (th-TH culture). Pages: Index, Inventory/Status, Health
+src/Invc.Web             Razor Pages (th-TH culture). Pages: Index, Inventory/Status, Inventory/Detail/{code}, Health
 tests/Invc.UnitTests     offline tests (rules, SQL guard, connection-string policy)
 tests/Invc.IntegrationTests  read-only parity tests against INV; auto-skip when unreachable
 docs/                    Phase 0 audit + business rules + parity matrix + setup
@@ -38,9 +38,11 @@ legacy *.asp, Connections/, css/, js/…   legacy Classic ASP (Windows-874 encod
 - Every SQL string passes `ReadOnlySql.Ensure()` and is a single `SELECT`; parameters via Dapper (`@Name`, `DbString` for nvarchar).
 - Explicit column lists (INV_MD has an `nvarchar(max)` column); no `SELECT *`.
 - Reproduce legacy query semantics first (see `docs/legacy-query-map.md`), then document any deliberate deviation in the SQL class comment.
+- `COMPANY.COMPANY_CODE` and the `DRUG_VN` key are not unique in production: use `OUTER APPLY (SELECT TOP 1 …)` for name lookups, never a plain LEFT JOIN that can multiply rows.
 - Legacy relationships have no FKs; model them in SQL (`MS_PO_C.PO_NO = MS_PO.PO_NO`, `MS_IVO.PO_NO = MS_PO.REAL_PO`, fiscal year = `LEFT(PO_NO,2)`).
 - DB compatibility level is 100: no `TRY_CAST`, `STRING_AGG`, `OPENJSON`, `FORMAT`.
 
 ## Key docs
 `docs/data-source-map.md` (schema + evidence), `docs/inventory-business-rules.md`, `docs/purchase-order-business-rules.md`,
-`docs/report-parity-matrix.md`, `docs/phase0-security-and-data-access.md`, `docs/development-setup.md`.
+`docs/report-parity-matrix.md`, `docs/phase2-inventory-parity.md` (executed A1–A10 + deviation decisions),
+`docs/phase0-security-and-data-access.md`, `docs/development-setup.md`.

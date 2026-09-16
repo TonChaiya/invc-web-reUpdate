@@ -23,11 +23,14 @@
                         <li class="nav-item"><a class="nav-link text-dark" asp-page="/Inventory/Status">สถานะคงคลัง</a></li>
                         <li class="nav-item"><a class="nav-link text-dark" asp-page="/Health">สถานะระบบ</a></li>
                     </ul>
+                    @if (ViewData["HideNavSearch"] is not true)
+                    {
                     <form class="d-flex" method="get" asp-page="/Inventory/Status" role="search">
-                        <input class="form-control me-2" type="search" name="q" maxlength="60"
+                        <input class="form-control me-2" type="search" name="q" maxlength="@Invc.Core.Inventory.SearchKeyword.MaxLength"
                                placeholder="รหัสยา / ชื่อยา / ส่วนประกอบ" aria-label="ค้นหา" />
                         <button class="btn btn-outline-primary" type="submit">ค้นหา</button>
                     </form>
+                    }
                 </div>
             </div>
         </nav>
