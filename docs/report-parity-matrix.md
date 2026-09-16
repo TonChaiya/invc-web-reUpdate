@@ -55,7 +55,7 @@ Because the legacy Idiom-B pages cannot run, the baseline is the **legacy SQL ex
 | C7 | R receipts | MS_IVO where PO_NO = REAL_PO | 0 |
 | C8 | Join-loss guard | count with INNER joins vs. LEFT joins must be equal, else report the orphan codes | 1 = 1 |
 | C9 | BILLOUT date list | distinct BILLOUT for FY | 0 dates |
-| C10 | Non-PO receipts (new) | `OTH_IVO` count / `SUM(OTH_IVOC.QTY_ORDER)` by RCV_TYPE for FY | 110 headers / 1 018 lines — no legacy equivalent; parity = raw SQL |
+| C10 | Non-PO receipts (new) | `OTH_IVO` count / `SUM(OTH_IVOC.QTY_ORDER)` by RCV_TYPE for FY | 110 headers / 1 018 lines — no legacy equivalent; parity = raw SQL. **Phase 5 (2026-09-16): expanded to C10a–C10j, all PASS — see `docs/phase5-receipts-parity.md`, automated in `ReceiptParityTests`** |
 | C11 | Process-time KPI | avg DATEDIFF PO_DATE→BILLIN→BILLOUT→BILLEND per month | NULL (no dates yet) |
 
 ## D. Dashboard (default.asp + Dashboard.asp → new Dashboard)

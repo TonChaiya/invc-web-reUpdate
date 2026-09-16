@@ -7,6 +7,8 @@ using Invc.Core.Reorder;
 using Invc.Infrastructure.Reorder;
 using Invc.Core.PurchaseOrders;
 using Invc.Infrastructure.PurchaseOrders;
+using Invc.Core.Receipts;
+using Invc.Infrastructure.Receipts;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -25,6 +27,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IInventoryRepository, InventoryRepository>();
         services.AddScoped<IReorderRepository, ReorderRepository>();
         services.AddScoped<IPurchaseOrderRepository, PurchaseOrderRepository>();
+        services.AddScoped<INonPoReceiptRepository, NonPoReceiptRepository>();
         services.AddScoped<IDatabaseHealth, DatabaseHealth>();
         return services;
     }

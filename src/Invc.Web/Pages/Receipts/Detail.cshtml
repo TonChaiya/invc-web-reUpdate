@@ -1,0 +1,31 @@
+@page "{receiveNo}"
+@model Invc.Web.Pages.Receipts.DetailModel
+@{
+    ViewData["Title"] = Model.Receipt is null ? "ใบรับเข้า" : $"ใบรับเข้า {Model.Receipt.Header.ReceiveNo}";
+    ViewData["HideNavSearch"] = true;
+}
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb mb-2">
+        <li class="breadcrumb-item"><a asp-page="/Receipts/Index" asp-route-fy="@Model.Receipt?.Header.FiscalYear">รับเข้าอื่น / รับจาก CUP</a></li>
+        <li class="breadcrumb-item active" aria-current="page">@Model.ReceiveNo</li>
+    </ol>
+</nav>
+
+@if (Model.HasError)
+{
+    <div class="alert alert-danger" role="alert">
+        ไม่สามารถอ่านข้อมูลใบรับเข้าจากฐานข้อมูล INV ได้ กรุณาตรวจสอบหน้า <a asp-page="/Health" class="alert-link">สถานะระบบ</a>
+    </div>
+}
+else if (Model.Receipt is { } receipt)
+{
+    <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">
+        <div>
+            <h1 class="h3 mb-0">ใบรับเข้า <span class="inv-code">@receipt.Header.ReceiveNo</span> <span class="text-muted fs-6 fw-normal">(ไม่อ้างอิงใบสั่งซื้อ)</span></h1>
+            <p class="text-muted mb-0">@receipt.Header.TypeDisplayName · @receipt.Header.SourceDisplayName · @(receipt.Header.DateReceive?.ToString("d MMMM yyyy"))</p>
+        </div>
+        <a class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener" asp-page="/Receipts/Print" asp-route-receiveNo="@receipt.Header.ReceiveNo">พิมพ์ / บันทึกเป็น PDF</a>
+    </div>
+    <partial name="_ReceiptBody" model="receipt" />
+}

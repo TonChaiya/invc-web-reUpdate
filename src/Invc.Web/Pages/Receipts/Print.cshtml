@@ -1,0 +1,36 @@
+@page "{receiveNo}"
+@model Invc.Web.Pages.Receipts.PrintModel
+@{
+    Layout = null;
+    ViewData["Print"] = true;
+    var number = Model.Receipt?.Header.ReceiveNo ?? Model.ReceiveNo;
+}
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ใบรับเข้า @number - INVC</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/print.css" asp-append-version="true" />
+</head>
+<body class="print-body">
+    <div class="no-print d-flex gap-2 align-items-center mb-3">
+        <button type="button" class="btn btn-primary" onclick="window.print()">พิมพ์ / บันทึกเป็น PDF</button>
+        <a class="btn btn-outline-secondary" asp-page="/Receipts/Detail" asp-route-receiveNo="@number">กลับหน้าใบรับเข้า</a>
+    </div>
+    <header class="print-header">
+        <h1 class="h4 mb-1">ใบรับเข้าอื่น (ไม่อ้างอิงใบสั่งซื้อ) @number</h1>
+        <div class="print-meta">คลังเวชภัณฑ์หลัก · พิมพ์เมื่อ @DateTime.Now.ToString("d MMMM yyyy HH:mm")</div>
+    </header>
+    @if (Model.HasError)
+    {
+        <div class="alert alert-danger" role="alert">ไม่สามารถอ่านข้อมูลใบรับเข้าจากฐานข้อมูล INV ได้</div>
+    }
+    else if (Model.Receipt is { } receipt)
+    {
+        <partial name="_ReceiptBody" model="receipt" />
+    }
+</body>
+</html>
