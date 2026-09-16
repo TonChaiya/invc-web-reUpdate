@@ -1,50 +1,88 @@
-# IIS deployment runbook — INVC Web (FUTURE, owner-approved deployment only)
+# IIS deployment runbook — INVC Web (FUTURE — REQUIRES EXPLICIT OWNER APPROVAL for every infrastructure step)
 
-**Status: NOT EXECUTED.** This document describes how the release package produced in Phase 7 would be deployed and rolled back.
-Every step below changes infrastructure and therefore requires explicit owner approval and an approved maintenance window.
-No step has been run against this machine. The application reads INV read-only; the database never changes.
+**Status: NOT EXECUTED.** Phase 7 produced the release package; Phase 8 (2026-09-16) discovered the environment read-only and wrote the
+design spec `docs/superpowers/specs/2026-09-16-iis-deployment-design.md`. This runbook now carries the discovered facts and the
+owner-approved access model. No step in §C–§E has been run. The application reads INV read-only; the database never changes.
+
+## A0. Discovered facts used below (see `docs/phase8-environment-discovery.md`)
+| Fact | Value |
+|---|---|
+| Host | `DESKTOP-BVH8F8L`, Windows 10 Pro 22H2, **WORKGROUP**, Wi-Fi DHCP `192.168.1.10/24`, firewall disabled |
+| IIS | 10.0; Default Web Site :80; legacy Classic ASP at **`/invc` → `C:\INVC\Web` (repository working copy, INFERRED)**; Windows Authentication feature installed; no ANCM |
+| Ports | 80 IIS · **443 Laragon Apache** · 8080 other http.sys · 8081 Laragon · 1433 SQL Server |
+| SQL Server | 2022 Enterprise Evaluation, default instance, **same machine**, Mixed mode, `INV` ONLINE; logins `sa` + developer (sysadmin); **no read-only principal** |
+| HTTPS | no IIS binding; only a SAN-less self-issued certificate (`CN=192.168.1.99, CN=desktop-bvh8f8l`) → unusable |
+| Package | `.work/release/publish`, 236 files, 25.6 MB, framework-dependent, audit PASSED |
+
+## A1. Owner-approved access model (design target — NOT applied)
+```
+AUTHENTICATION TARGET (INVC-Web site only)
+  IIS Windows Authentication : ENABLED   (Negotiate/NTLM; NTLM in this workgroup)
+  IIS Anonymous Authentication : DISABLED
+  ASP.NET Core application login : NONE   (no Login.cshtml / Account pages, no AddAuthentication, no Identity, no passwords stored)
+  Authorization : none (all IIS-authenticated users have the same read-only capability)
+```
+A Windows credential prompt on clients whose account does not match a local account on the host is expected in a workgroup and is an
+infrastructure/client-policy matter — it never justifies an application login form.
 
 ## A. Prerequisites (all must be true before any deployment step)
-| # | Prerequisite | Owner | Status |
+| # | Prerequisite | Owner | Status after Phase 8 |
 |---|---|---|---|
-| 1 | Target Windows/IIS host identified (this machine `DESKTOP-BVH8F8L` or another) | owner | OWNER DECISION |
-| 2 | **.NET 10 Hosting Bundle** (ASP.NET Core Module V2 + runtime 10.0.x) installed on the host | administrator | EXTERNAL — not verified/installed |
-| 3 | HTTPS certificate obtained and an HTTPS binding planned; HTTP→HTTPS redirect + HSTS are enforced by the app once the binding exists | administrator | EXTERNAL |
-| 4 | Access-control model decided: IIS Windows Authentication (recommended for intranet) or another approved mechanism; the app has no built-in login | owner | OWNER DECISION |
-| 5 | Production `AllowedHosts` value (host name(s) users will type) | owner | OWNER DECISION |
-| 6 | **Read-only database identity**: either the app-pool Windows identity granted `db_datareader` on `INV`, or a dedicated SQL login (e.g. `invc_web_ro`) with `db_datareader` + `DENY INSERT/UPDATE/DELETE/EXECUTE` — provisioned by the DBA, never by the app or this project | DBA | **BLOCKED until provisioned** |
-| 7 | `InvDatabase__ConnectionString` supplied externally (IIS `environmentVariables` on the site/app pool) — never in a file in the repository; never `sa` | administrator | pending #6 |
-| 8 | Application folder chosen (e.g. `D:\Apps\InvcWeb\current`) — **not** the legacy Classic ASP folder and **not** `C:\INVC\Web` | owner | OWNER DECISION |
-| 9 | Filesystem permissions: app-pool identity read/execute on the app folder; write only if stdout logging is later enabled to a `logs\` folder | administrator | pending |
-| 10 | Backup of any existing site/config (`%windir%\System32\inetsrv\config\applicationHost.config`, current site folder) | administrator | pending |
-| 11 | Maintenance / cutover window agreed; legacy Classic ASP site remains available as fallback | owner | pending |
+| 1 | Target host = `DESKTOP-BVH8F8L` (IIS and SQL Server on the same machine) | owner | **CONFIRMED by discovery**; owner to accept Windows 10 Pro/laptop/Wi-Fi/Evaluation-edition risks (OWNER DECISION) |
+| 2 | **.NET 10 Hosting Bundle** (ANCM V2 + ASP.NET Core Runtime 10.0.x) installed | administrator | **BLOCKED — not installed** (no `aspnetcorev2.dll`, no machine-wide dotnet) |
+| 3 | Certificate for the chosen hostname + HTTPS port decision (443 is held by Laragon Apache → free it or use 8443) | administrator/owner | **BLOCKED — EXTERNAL**; no usable certificate |
+| 4 | Access-control model | owner | **APPROVED: IIS Windows Authentication, no application login** (§A1) |
+| 5 | Production `AllowedHosts` | owner | proposed `DESKTOP-BVH8F8L;desktop-bvh8f8l.local` — **OWNER DECISION** (keep name, fix address, optional DNS alias) |
+| 6 | **Read-only database identity**: recommended `IIS AppPool\INVC-Web` (virtual account of the new pool) as Windows login + `INV` user in `db_datareader` with `DENY INSERT, UPDATE, DELETE, EXECUTE ON SCHEMA::dbo`; fallback: SQL login `invc_web_ro` | DBA | **BLOCKED — DBA/ADMIN ACTION REQUIRED** (no such principal exists) |
+| 7 | `InvDatabase__ConnectionString` supplied only as an IIS environment variable — Option A shape: `Server=DESKTOP-BVH8F8L;Initial Catalog=INV;Integrated Security=True;ApplicationIntent=ReadOnly;Encrypt=True;TrustServerCertificate=True;Application Name=Invc.Web` (no password) | administrator | pending #6 |
+| 8 | Application folder `D:\Apps\InvcWeb\releases\<id>` (D: exists, 29 GB free) — **never** `C:\INVC\Web`, never the legacy folder, never `C:\inetpub\wwwroot` | owner | proposed — folder not created |
+| 9 | Filesystem permissions: `IIS AppPool\INVC-Web` read/execute on the release folder; write only on `D:\Apps\InvcWeb\logs\` if file logging is ever enabled | administrator | pending |
+| 10 | Backup of `%windir%\System32\inetsrv\config\applicationHost.config` and an **elevated read-only** export of current sites/pools/auth settings | administrator | pending (Phase 8 could not read IIS config unelevated) |
+| 11 | Local Windows accounts on the host for INVC users (or a domain join) so that Windows Authentication can succeed | owner/administrator | **OWNER DECISION** |
+| 12 | Decision on isolating the legacy `/invc` application from the repository working copy (re-point to a copy / remove after acceptance) | owner | **OWNER DECISION (safety)** |
+| 13 | Maintenance / acceptance window; legacy `/invc` stays available as fallback | owner | pending |
 
 ## B. Package preparation (inside the project — the only part this project performs)
-1. `scripts\verify.ps1` — restore, build (Release), all tests, `git diff --check`.
-2. `scripts/publish-iis.ps1` — framework-dependent Release publish to `.work/release/publish` (refuses any path outside the project).
+1. `scripts/verify.ps1` — restore, build (Release), all tests, `git diff --check`.
+2. `scripts/publish-iis.ps1` — framework-dependent Release publish to `.work/release/publish` (refuses any path outside the project; shared guard `scripts/project-path-guard.ps1`).
 3. `scripts/test-release-artifact.ps1` — fails on legacy ASP, source, symbols, dev config, shipped secrets, wrong web.config.
-4. `scripts/new-release-manifest.ps1` — SHA-256 manifest with commit SHA (keep alongside the package for traceability).
+4. `scripts/new-release-manifest.ps1` — SHA-256 manifest with commit SHA (copied alongside the package for traceability).
 5. Published Production-mode smoke and negative smoke (see `docs/phase7-release-readiness.md` §6–7).
 
-## C. Future deployment steps (high level — DO NOT RUN without approval)
-1. Confirm every prerequisite in §A; record the manifest commit SHA of the package to be deployed.
-2. Copy the audited `.work/release/publish` contents to a **new versioned folder** on the host (e.g. `…\InvcWeb\releases\<sha>`); never overwrite the running folder.
-3. Create/verify the IIS application pool: **No Managed Code**, identity per §A.4/§A.6, `Start Mode` as required.
-4. Create the IIS site/application pointing at the versioned folder (or repoint the physical path of an existing site).
-5. Set `ASPNETCORE_ENVIRONMENT=Production`, `AllowedHosts=<hosts>`, `InvDatabase__ConnectionString=<read-only identity>` as IIS environment variables (app pool / site level).
-6. Add the HTTPS binding with the certificate; keep an HTTP binding only for redirection.
-7. Apply the chosen access control (e.g. enable Windows Authentication, disable Anonymous) in IIS.
-8. Start the site; verify `/Health` returns 200 and shows `INVC Web · Production` with no server/login details; verify `/`, `/Inventory/Status`,
-   `/Reorder`, `/PurchaseOrders`, `/Receipts` over HTTPS; verify the response headers; verify a forged Host header is rejected (400).
-9. Record deployment: commit SHA, manifest hash, time, operator.
+## C. Future deployment steps — FUTURE — REQUIRES EXPLICIT OWNER APPROVAL (side-by-side; do not run)
+0. Elevated **read-only** confirmation: `Get-Website`, `Get-WebApplication -Site 'Default Web Site'`, `Get-ChildItem IIS:\AppPools`, authentication GETs; back up `applicationHost.config`.
+1. Administrator installs the Hosting Bundle (restarts `W3SVC` as part of the installer). Verify `%windir%\System32\inetsrv\aspnetcorev2.dll` exists.
+2. Confirm every prerequisite in §A; record the manifest commit SHA of the package to be deployed.
+3. Copy the audited `.work/release/publish` contents to **`D:\Apps\InvcWeb\releases\<yyyyMMdd-HHmm>_<sha7>\`** (new folder; never overwrite a live folder); copy `release-manifest.json` next to it; append to `D:\Apps\InvcWeb\RELEASES.md`.
+4. Create app pool **`INVC-Web`**: No Managed Code, Integrated, ApplicationPoolIdentity, 32-bit off. (Creating it materialises `IIS AppPool\INVC-Web`.)
+5. DBA provisions the read-only principal for `IIS AppPool\INVC-Web` (§A.6) — SQL statements are the DBA's, reviewed, never run by this project.
+6. Create site **`INVC-Web`** → physical path `releases\<id>`, HTTP binding on the acceptance port (proposed **8090**), host header `DESKTOP-BVH8F8L`.
+7. Set IIS environment variables on the site's `aspNetCore` element / pool: `ASPNETCORE_ENVIRONMENT=Production`, `AllowedHosts=<approved>`, `InvDatabase__ConnectionString=<§A.7>`, and `ASPNETCORE_HTTPS_PORT` if the HTTPS port is not 443.
+8. On **INVC-Web only**: enable Windows Authentication, disable Anonymous Authentication (§A1). Default Web Site and `/invc` unchanged.
+9. Add the HTTPS binding with the owner-provided certificate (443 or 8443 per decision); keep HTTP only for redirection.
+10. Verify: unauthenticated request → 401 challenge; authenticated `/Health` → 200 `INVC Web · Production` without technical details; `/`, `/Inventory/Status`,
+    `/Reorder`, `/PurchaseOrders`, `/Receipts` and print pages over HTTPS; security headers; forged `Host` → 400; `Dashboard` figures vs legacy `/invc` reports.
+11. Acceptance from ≥ 2 client PCs; record SSO behaviour (transparent vs prompt) per client.
+12. Record deployment: release-id, commit SHA, manifest hash, time, operator.
 
-## D. Rollback (future — DO NOT RUN now)
-1. Before any deployment: keep the previously deployed package folder intact; export/backup IIS configuration; note the current physical path and the commit SHA/manifest of the running package.
-2. To roll back: stop or recycle the app pool **only within the approved window**; repoint the site's physical path to the previous versioned folder
-   (or restore the backed-up folder); restore the backed-up IIS configuration if bindings/pool settings were changed; start the pool.
-3. Re-run the smoke checks of §C.8 against the rolled-back site.
-4. Record the rollback (which SHA is now live, why, when, who).
+## C2. Cutover (after acceptance; FUTURE — REQUIRES EXPLICIT OWNER APPROVAL)
+Preferred reversible method: `httpRedirect` on Default Web Site `/invc` → `https://DESKTOP-BVH8F8L:<port>/` (302). Alternative: move the :80 host
+binding to INVC-Web. Never overwrite `/invc`, never delete legacy files. Separately (safety, §A.12): re-point `/invc` to a **copy** of the legacy
+folder so the repository working copy stops being a web root.
+
+## D. Rollback — FUTURE — REQUIRES EXPLICIT OWNER APPROVAL (do not run now)
+| Checkpoint | Restore | Verify |
+|---|---|---|
+| R0 | backup of `applicationHost.config`; note current physical paths, bindings, auth values, live release-id | — |
+| R1 new site/pool exist | remove only site/pool `INVC-Web` | `/invc` still 200 |
+| R2 new release live | re-point INVC-Web physical path to the previous `releases\<id>`; recycle pool | `/Health` 200, manifest SHA of the previous release |
+| R3 auth changed | restore auth values on INVC-Web from R0 (new site only) | 401/200 behaviour as before |
+| R4 HTTPS binding | remove binding (certificate stays) | HTTP acceptance URL works |
+| R5 cutover redirect | remove `httpRedirect` on `/invc` (or move the binding back) | `http://DESKTOP-BVH8F8L/invc/` serves legacy |
+No database rollback is needed (read-only application). Record every rollback (which release-id is live, why, when, who).
 
 ## E. Explicitly out of scope for this project
-Installing runtimes/bundles, creating IIS sites/pools/bindings, installing certificates, enabling authentication, creating SQL logins/users or
-granting permissions, copying files to `inetpub` or any web root, `appcmd`/`msdeploy`/IIS PowerShell modules, `iisreset`, service restarts.
+Installing runtimes/bundles, creating IIS sites/pools/bindings, installing certificates, enabling/disabling authentication, creating SQL logins/users or
+granting permissions, creating local Windows accounts, copying files to any web root, `appcmd`/`msdeploy`/IIS PowerShell **write** operations,
+`iisreset`, service restarts, Laragon/Apache, firewall, DNS, registry, Access frontends. Phase 9 may perform the items of spec §23 only after the
+owner approves the spec and prerequisites §A.2, §A.3 and §A.6 are completed by the administrator/DBA.
