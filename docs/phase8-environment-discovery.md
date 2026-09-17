@@ -168,3 +168,21 @@ with a `W3SVC` restart afterwards (Microsoft installer behaviour) — outside th
 | Whether the machine keeps this name / gets a fixed address / a DNS alias | infrastructure | OWNER DECISION REQUIRED (spec §9) |
 | Who administers Laragon Apache on 443 | not observable | OWNER DECISION REQUIRED (spec §10) |
 | Windows 10 Pro as a long-term server (10-connection IIS limit, laptop hardware, Wi-Fi, Evaluation SQL edition expiring ~2027-01) | outside scope | recorded as risk; OWNER DECISION |
+
+## 16. Phase 9 addendum (elevated re-check, 2026-09-17)
+
+Elevated `Get-Website`/raw `applicationHost.config` read (Phase 9 Checkpoint 0) resolved several Phase 8 UNRESOLVED items:
+
+| Item | Value | Label |
+|---|---|---|
+| Legacy INVC | virtual directory **`/INVC`** under Default Web Site's root application (`app path=/`), **not** a separate IIS application — inherits **`DefaultAppPool`** | OBSERVED (elevated) |
+| Physical path | `C:\INVC\Web`, confirmed via raw `applicationHost.config` | OBSERVED (elevated) |
+| Default Web Site bindings | `*:80:` and `192.168.1.99:8080:invc-ksl.ddns.net` | OBSERVED (elevated) |
+| `invc-ksl.ddns.net` binding | **OWNER-CONFIRMED (2026-09-17): intentional.** The owner configured this DDNS name/port-forward so external users can reach the **legacy** `/INVC` site from outside the LAN. This is a pre-existing, deliberate legacy access path — not a Phase 9 artifact and not a misconfiguration. | OWNER-CONFIRMED |
+
+**Constraints this places on Phase 9** (owner-directed):
+- Do not modify, remove, repoint, redirect, or reuse the `invc-ksl.ddns.net` binding or the `192.168.1.99:8080` binding.
+- Do not touch router, NAT, DDNS, or firewall configuration.
+- Legacy external access via `invc-ksl.ddns.net` must remain available and unaffected throughout Phase 9.
+- The new side-by-side `INVC-Web` acceptance site is bound only to `DESKTOP-BVH8F8L:8090` / `:8443` and must **not** be exposed externally during Phase 9 (no new port-forward/DDNS entry for it).
+- Final disposition of `invc-ksl.ddns.net` (kept, redirected, retired) is deferred to the cutover phase and requires a separate owner decision — out of scope for Phase 9.

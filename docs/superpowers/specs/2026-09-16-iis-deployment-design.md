@@ -19,7 +19,13 @@ deletion of the legacy ASP files, no change to Access frontends, no Laragon/Apac
 - IIS 10.0 (enabled 2026-09-15), `W3SVC` running; single site **Default Web Site** (ID 1) on HTTP :80, no HTTPS binding.
 - Legacy INVC: IIS application **`/invc`** under Default Web Site, physical path **`C:\INVC\Web` (the repository working copy — INFERRED, byte-exact)**,
   Classic ASP working, anonymous access, database access via `sa` in `Connections/` (Phase 0).
-- Port 443 held by Laragon Apache; 8080 by another http.sys reservation; 8081 Laragon HTTP.
+- Port 443 held by Laragon Apache; 8081 Laragon HTTP.
+- Port 8080 (`192.168.1.99:8080`, host header `invc-ksl.ddns.net`) is an **owner-confirmed intentional binding** on Default Web Site: a
+  DDNS/port-forward the owner configured so external users can reach the **legacy** `/INVC` virtual directory from outside the LAN
+  (confirmed 2026-09-17; see `docs/phase8-environment-discovery.md` §16). Phase 9 must not modify, remove, repoint, redirect, reuse this
+  binding, or touch router/NAT/DDNS/firewall configuration; legacy external access must stay available throughout Phase 9. The new
+  `INVC-Web` site is not exposed on this binding and gets no new external port-forward/DDNS entry during Phase 9. Final disposition of
+  `invc-ksl.ddns.net` is an owner decision deferred to the cutover phase.
 - SQL Server 2022 Enterprise Evaluation, default instance, **same machine**, TCP 1433, Mixed mode; `INV` ONLINE; logins: `sa`, the developer
   account (both sysadmin), service accounts; no reader principal.
 - No ASP.NET Core Module, no machine-wide .NET runtime.

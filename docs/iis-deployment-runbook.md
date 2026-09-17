@@ -9,7 +9,7 @@ owner-approved access model. No step in §C–§E has been run. The application 
 |---|---|
 | Host | `DESKTOP-BVH8F8L`, Windows 10 Pro 22H2, **WORKGROUP**, Wi-Fi DHCP `192.168.1.10/24`, firewall disabled |
 | IIS | 10.0; Default Web Site :80; legacy Classic ASP at **`/invc` → `C:\INVC\Web` (repository working copy, INFERRED)**; Windows Authentication feature installed; no ANCM |
-| Ports | 80 IIS · **443 Laragon Apache** · 8080 other http.sys · 8081 Laragon · 1433 SQL Server |
+| Ports | 80 IIS · **443 Laragon Apache** · **8080 IIS, owner-confirmed intentional DDNS/port-forward (`invc-ksl.ddns.net`) exposing legacy `/INVC` externally — never modify (see phase8-environment-discovery.md §16)** · 8081 Laragon · 1433 SQL Server |
 | SQL Server | 2022 Enterprise Evaluation, default instance, **same machine**, Mixed mode, `INV` ONLINE; logins `sa` + developer (sysadmin); **no read-only principal** |
 | HTTPS | no IIS binding; only a SAN-less self-issued certificate (`CN=192.168.1.99, CN=desktop-bvh8f8l`) → unusable |
 | Package | `.work/release/publish`, 236 files, 25.6 MB, framework-dependent, audit PASSED |
