@@ -84,16 +84,31 @@ No OS reboot required or authorized here.
 
 ## Checkpoint C — Fresh audited release package (project side, from current HEAD)
 
+Run the full release pipeline, in order — all four must succeed:
 ```powershell
 git rev-parse HEAD   # record — this becomes the release's commit SHA
-.\scripts\dotnet-local.ps1 build Invc.slnx   # or: .\scripts\verify.ps1
+.\scripts\verify.ps1
 .\scripts\publish-iis.ps1
 .\scripts\test-release-artifact.ps1
 .\scripts\new-release-manifest.ps1
 ```
-Record: commit SHA, the manifest's SHA-256, and derive the release ID as `yyyyMMdd-HHmm_<sha7>`.
+The manifest is written to `.work\release\manifest\release-manifest.json` (the script's default `-ManifestPath`, distinct from the
+publish output at `.work\release\publish\`). Record and check it before proceeding:
+```powershell
+$manifestPath = 'C:\INVC\Web\.work\release\manifest\release-manifest.json'
+Test-Path $manifestPath   # expect True — if False, STOP: do not deploy a release without its manifest
+Get-FileHash $manifestPath -Algorithm SHA256
 
-**STOP AND REPORT**: commit SHA, release ID, manifest hash.
+$manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+$manifest.commit -eq (git rev-parse HEAD)   # expect True
+$manifest.workingTreeDirty                   # expect False
+$manifest.fileCount -gt 0                    # expect True
+```
+If any of the three checks above is not as expected, STOP — do not deploy this package.
+
+Derive the release ID as `yyyyMMdd-HHmm_<sha7>` from the commit SHA and current time.
+
+**STOP AND REPORT**: commit SHA, release ID, manifest path, manifest SHA-256, and the three verification results.
 
 ---
 
@@ -108,11 +123,18 @@ New-Item -ItemType Directory -Force D:\Apps\InvcWeb\releases\<release-id> | Out-
 New-Item -ItemType Directory -Force D:\Apps\InvcWeb\logs | Out-Null
 New-Item -ItemType Directory -Force D:\Apps\InvcWeb\certs | Out-Null
 Copy-Item C:\INVC\Web\.work\release\publish\* D:\Apps\InvcWeb\releases\<release-id>\ -Recurse
-Copy-Item C:\INVC\Web\.work\release\release-manifest.json D:\Apps\InvcWeb\releases\<release-id>\ -ErrorAction SilentlyContinue
-Add-Content D:\Apps\InvcWeb\RELEASES.md "<release-id> | <commit-sha> | <manifest-hash> | $(Get-Date -Format s) | $env:USERNAME | new"
+
+$manifestPath = 'C:\INVC\Web\.work\release\manifest\release-manifest.json'
+if (-not (Test-Path $manifestPath)) { throw "STOP: manifest not found at $manifestPath — do not deploy a release without its manifest" }
+$sourceHash = (Get-FileHash $manifestPath -Algorithm SHA256).Hash
+Copy-Item $manifestPath "D:\Apps\InvcWeb\releases\<release-id>\release-manifest.json"
+$deployedHash = (Get-FileHash "D:\Apps\InvcWeb\releases\<release-id>\release-manifest.json" -Algorithm SHA256).Hash
+if ($deployedHash -ne $sourceHash) { throw "STOP: deployed manifest hash ($deployedHash) does not match source hash ($sourceHash)" }
+
+Add-Content D:\Apps\InvcWeb\RELEASES.md "<release-id> | <commit-sha> | $sourceHash | $(Get-Date -Format s) | $env:USERNAME | new"
 ```
 
-**STOP AND REPORT**: folder listing of `D:\Apps\InvcWeb\releases\<release-id>`.
+**STOP AND REPORT**: folder listing of `D:\Apps\InvcWeb\releases\<release-id>`, source manifest SHA-256, deployed manifest SHA-256 (must match).
 
 ---
 
