@@ -17,6 +17,14 @@ public class PrintModel(IReorderRepository reorder, ILogger<PrintModel> logger) 
     [BindProperty(SupportsGet = true, Name = "q")]
     public string? Keyword { get; set; }
 
+    /// <summary>ประเภทเวชภัณฑ์ (INV_MD.ED_NED) — the page's one category control; null = ทุกประเภท.</summary>
+    [BindProperty(SupportsGet = true, Name = "type")]
+    public string? TypeRaw { get; set; }
+
+    public IReadOnlyList<ItemType> ItemTypes { get; private set; } = [];
+    public string? ItemTypeCode { get; private set; }
+    public ItemType? SelectedItemType => ItemTypeCode is null ? null : ItemTypes.FirstOrDefault(t => t.Code == ItemTypeCode);
+
     public ReorderStatusFilter Filter { get; private set; } = ReorderStatusFilter.Red;
     public ReorderReport? Report { get; private set; }
     public bool HasError { get; private set; }
@@ -28,8 +36,10 @@ public class PrintModel(IReorderRepository reorder, ILogger<PrintModel> logger) 
         Keyword = SearchKeyword.Normalize(Keyword);
         try
         {
+            ItemTypes = await reorder.GetItemTypesAsync(cancellationToken);
+            ItemTypeCode = ItemType.NormalizeCode(TypeRaw, ItemTypes);
             var eligible = await reorder.GetEligibleAsync(Keyword, cancellationToken);
-            Report = ReorderReport.Build(eligible, Filter, Keyword);
+            Report = ReorderReport.Build(eligible, Filter, Keyword, ItemTypeCode);
         }
         catch (Exception ex)
         {

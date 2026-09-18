@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.RegularExpressions;
+using Invc.Core.Inventory;
 using Invc.Core.Reorder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -34,12 +35,12 @@ public sealed class ReorderPageUiTests : IClassFixture<ReorderPageUiTests.Factor
         // 2 red (stock < MIN), 1 yellow (MIN ≤ stock < ROP), 3 green, one of them without thresholds.
         private static readonly IReadOnlyList<ReorderItem> Items =
         [
-            new() { WorkingCode = "1000130", DrugName = "Clindamycin 300 mg cap", QtyOnHand = 0, MinLevel = 33, ReorderQty = 33, MaxLevel = 50, SaleUnit = "CAP", RatePerMonth = 10 },
-            new() { WorkingCode = "1000250", DrugName = "Gabapentin 300 mg cap", QtyOnHand = 200, MinLevel = 433, ReorderQty = 433, MaxLevel = 650, SaleUnit = "CAP", RatePerMonth = 433 },
-            new() { WorkingCode = "1000500", DrugName = "Yellow test item", QtyOnHand = 100, MinLevel = 100, ReorderQty = 150, MaxLevel = 200, SaleUnit = "TAB", RatePerMonth = 50 },
-            new() { WorkingCode = "1000010", DrugName = "Acyclovir 400 mg tab", QtyOnHand = 100, MinLevel = 100, ReorderQty = 100, MaxLevel = 150, SaleUnit = "TAB", RatePerMonth = 100 },
-            new() { WorkingCode = "1000020", DrugName = "Albendazole 200 mg tab", QtyOnHand = 100, MinLevel = 0, ReorderQty = 0, MaxLevel = 0, SaleUnit = "TAB", RatePerMonth = 0 },
-            new() { WorkingCode = "3000860", DrugName = "ซอง sterile 6 นิ้ว", QtyOnHand = 0, MinLevel = 0, ReorderQty = 0, MaxLevel = 0, SaleUnit = "ซอง", RatePerMonth = null },
+            new() { WorkingCode = "1000130", DrugName = "Clindamycin 300 mg cap", QtyOnHand = 0, MinLevel = 33, ReorderQty = 33, MaxLevel = 50, SaleUnit = "CAP", RatePerMonth = 10, EdNedCode = "1", EdNedName = "ยาในบัญชียาหลักแห่งชาติ" },
+            new() { WorkingCode = "1000250", DrugName = "Gabapentin 300 mg cap", QtyOnHand = 200, MinLevel = 433, ReorderQty = 433, MaxLevel = 650, SaleUnit = "CAP", RatePerMonth = 433, EdNedCode = "2", EdNedName = "ยานอกบัญชียาหลักแห่งชาติ" },
+            new() { WorkingCode = "1000500", DrugName = "Yellow test item", QtyOnHand = 100, MinLevel = 100, ReorderQty = 150, MaxLevel = 200, SaleUnit = "TAB", RatePerMonth = 50, EdNedCode = "1", EdNedName = "ยาในบัญชียาหลักแห่งชาติ" },
+            new() { WorkingCode = "1000010", DrugName = "Acyclovir 400 mg tab", QtyOnHand = 100, MinLevel = 100, ReorderQty = 100, MaxLevel = 150, SaleUnit = "TAB", RatePerMonth = 100, EdNedCode = "1", EdNedName = "ยาในบัญชียาหลักแห่งชาติ" },
+            new() { WorkingCode = "1000020", DrugName = "Albendazole 200 mg tab", QtyOnHand = 100, MinLevel = 0, ReorderQty = 0, MaxLevel = 0, SaleUnit = "TAB", RatePerMonth = 0, EdNedCode = "1", EdNedName = "ยาในบัญชียาหลักแห่งชาติ" },
+            new() { WorkingCode = "3000860", DrugName = "ซอง sterile 6 นิ้ว", QtyOnHand = 0, MinLevel = 0, ReorderQty = 0, MaxLevel = 0, SaleUnit = "ซอง", RatePerMonth = null, EdNedCode = "3", EdNedName = "วัสดุการแพทย์" },
         ];
 
         public Task<IReadOnlyList<ReorderItem>> GetEligibleAsync(string? keyword, CancellationToken cancellationToken = default)
@@ -49,6 +50,13 @@ public sealed class ReorderPageUiTests : IClassFixture<ReorderPageUiTests.Factor
                 : Items.Where(i => i.DrugName.Contains(keyword, StringComparison.OrdinalIgnoreCase) || i.WorkingCode.Contains(keyword)).ToList();
             return Task.FromResult(result);
         }
+
+        public Task<IReadOnlyList<ItemType>> GetItemTypesAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<ItemType>>(
+            [
+                new("1", "ยาในบัญชียาหลักแห่งชาติ", "ED"), new("2", "ยานอกบัญชียาหลักแห่งชาติ", "NED"), new("3", "วัสดุการแพทย์", "MES"),
+                new("4", "วัสดุเภสัชกรรม", "EA"), new("5", "ยาตัวอย่างเพื่อทดลองใช้", "SAM"),
+            ]);
     }
 
     private readonly HttpClient _client;
@@ -99,8 +107,9 @@ public sealed class ReorderPageUiTests : IClassFixture<ReorderPageUiTests.Factor
         Assert.Single(current);
         Assert.Contains("status=green", current[0].Value);
         Assert.Contains("is-active", current[0].Value);
-        // no second selector for the same statuses
-        Assert.DoesNotContain("<select", html);
+        // no second selector for the same statuses (the only <select> is ประเภทเวชภัณฑ์)
+        Assert.DoesNotContain("name=\"status\"", Regex.Replace(html, "<input[^>]*>", ""));
+        Assert.Single(Regex.Matches(html, "<select"));
     }
 
     [Fact]
@@ -177,6 +186,44 @@ public sealed class ReorderPageUiTests : IClassFixture<ReorderPageUiTests.Factor
         var names = Regex.Matches(html, "class=\"ds-item-name\"[^>]*>([^<]+)<").Cast<Match>().Select(m => m.Groups[1].Value).ToArray();
         Assert.Equal(["Acyclovir 400 mg tab", "Albendazole 200 mg tab", "Clindamycin 300 mg cap", "Gabapentin 300 mg cap", "Yellow test item", "ซอง sterile 6 นิ้ว"], names);
         Assert.Contains("href=\"/Inventory/Detail/1000130\"", html);
+    }
+
+    [Fact]
+    public async Task Item_type_dropdown_is_the_single_category_control_and_composes_with_status_and_keyword()
+    {
+        var html = await GetAsync("/Reorder?status=all");
+        Assert.Single(Regex.Matches(html, "<select class=\"ds-select\" id=\"type\" name=\"type\""));
+        Assert.Contains("<option value=\"\">ทุกประเภท</option>", html);
+        Assert.Contains("<option value=\"1\">1 — ยาในบัญชียาหลักแห่งชาติ</option>", html);
+        Assert.Contains("<option value=\"5\">5 — ยาตัวอย่างเพื่อทดลองใช้</option>", html);
+        Assert.Equal(6, Regex.Matches(html, "<option value=").Count);          // ทุกประเภท + 5 live types, nowhere else
+        Assert.DoesNotContain("สรุปตามประเภท", html);
+        // row metadata carries EDNAME under the name (muted line, no extra column)
+        Assert.Contains("class=\"ds-item-meta reorder-item-type\">ยาในบัญชียาหลักแห่งชาติ</div>", html);
+        Assert.DoesNotContain("<th scope=\"col\">ประเภท", html);
+
+        var filtered = await GetAsync("/Reorder?status=red&type=1&q=cap");
+        Assert.Contains("<option value=\"1\" selected=\"selected\">", filtered);
+        Assert.Single(Regex.Matches(filtered, "<tr class=\"ds-row reorder-row"));   // Clindamycin: red + type 1 + "cap"; Gabapentin is type 2
+        Assert.Contains("1000130", filtered);
+        Assert.DoesNotContain("1000250", filtered);
+        Assert.Contains("ต้องสั่งซื้อทันที</strong> · ยาในบัญชียาหลักแห่งชาติ · 1 รายการ · ค้นหา “cap”", Regex.Replace(filtered, @"\s+", " "));
+        // status tabs, print and back links keep the type; counts describe the type
+        var tabs = Regex.Matches(filtered, "<a[^>]*class=\"reorder-tab[^\"]*\"[^>]*href=\"([^\"]+)\"");
+        Assert.Equal(4, tabs.Count);
+        Assert.All(tabs.Cast<Match>(), m => { Assert.Contains("type=1", m.Groups[1].Value); Assert.Contains("q=cap", m.Groups[1].Value); });
+        var print = Regex.Match(filtered, "<a[^>]*href=\"(/Reorder/Print[^\"]*)\"[^>]*>");
+        Assert.Contains("type=1", print.Groups[1].Value); Assert.Contains("status=red", print.Groups[1].Value); Assert.Contains("q=cap", print.Groups[1].Value);
+        // ล้าง clears keyword + type but keeps the status
+        var clear = Regex.Match(filtered, "<a class=\"ds-btn ds-btn-secondary\" href=\"([^\"]+)\">ล้าง</a>");
+        Assert.True(clear.Success); Assert.Contains("status=red", clear.Groups[1].Value); Assert.DoesNotContain("type=", clear.Groups[1].Value); Assert.DoesNotContain("q=", clear.Groups[1].Value);
+        // unknown type value → treated as ทุกประเภท
+        Assert.Equal(6, Regex.Matches(await GetAsync("/Reorder?status=all&type=zz"), "<tr class=\"ds-row reorder-row").Count);
+
+        var report = await GetAsync("/Reorder/Print?status=all&type=3");
+        Assert.Contains("<dt>ประเภทเวชภัณฑ์</dt><dd>วัสดุการแพทย์</dd>", report);
+        Assert.Single(Regex.Matches(report, "<tr>\\s*<td class=\"num muted\">"));
+        Assert.Contains("3000860", report);
     }
 
     [Fact]

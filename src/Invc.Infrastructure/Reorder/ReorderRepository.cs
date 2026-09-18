@@ -34,8 +34,20 @@ internal static class ReorderSql
                m.MAX_LEVEL      AS MaxLevel,
                m.SALE_UNIT      AS SaleUnit,
                m.LOCATION       AS Location,
-               m.RATE_PER_MONTH AS RatePerMonth
+               m.RATE_PER_MONTH AS RatePerMonth,
+               RTRIM(m.ED_NED)  AS EdNedCode,
+               e.EDNAME         AS EdNedName
         FROM dbo.INV_MD m
+        OUTER APPLY (SELECT TOP 1 x.EDNAME FROM dbo.TBLED_NED x WHERE x.EDCODE = m.ED_NED ORDER BY x.EDCODE) e
+        """;
+
+    /// <summary>ประเภทเวชภัณฑ์ dropdown source (INV_MD.ED_NED → TBLED_NED). Read-only, five rows in production.</summary>
+    public const string ItemTypes = """
+        SELECT RTRIM(t.EDCODE) AS Code,
+               RTRIM(t.EDNAME) AS Name,
+               RTRIM(t.EDMAP)  AS ShortName
+        FROM dbo.TBLED_NED t
+        ORDER BY t.EDCODE
         """;
 
     private const string OrderBy = """
@@ -79,6 +91,14 @@ public sealed class ReorderRepository(ISqlConnectionFactory connections) : IReor
                 commandTimeout: connections.CommandTimeoutSeconds, cancellationToken: cancellationToken);
 
         var rows = await connection.QueryAsync<ReorderItem>(command).ConfigureAwait(false);
+        return rows.AsList();
+    }
+
+    public async Task<IReadOnlyList<ItemType>> GetItemTypesAsync(CancellationToken cancellationToken = default)
+    {
+        await using var connection = await connections.OpenAsync(cancellationToken).ConfigureAwait(false);
+        var rows = await connection.QueryAsync<ItemType>(new CommandDefinition(ReadOnlySql.Ensure(ReorderSql.ItemTypes),
+            commandTimeout: connections.CommandTimeoutSeconds, cancellationToken: cancellationToken)).ConfigureAwait(false);
         return rows.AsList();
     }
 }

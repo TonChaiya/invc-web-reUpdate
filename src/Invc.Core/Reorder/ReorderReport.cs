@@ -9,9 +9,12 @@ namespace Invc.Core.Reorder;
 /// </summary>
 public sealed class ReorderReport
 {
-    private ReorderReport(IReadOnlyList<ReorderItem> eligible, ReorderStatusFilter filter, string? keyword)
+    private ReorderReport(IReadOnlyList<ReorderItem> eligible, ReorderStatusFilter filter, string? keyword, string? itemTypeCode)
     {
-        Eligible = eligible;
+        // ประเภทเวชภัณฑ์ filter composes with status and keyword; counts describe the selected type only.
+        ItemTypeCode = itemTypeCode;
+        Eligible = itemTypeCode is null ? eligible : eligible.Where(i => i.EdNedCode == itemTypeCode).ToList();
+        eligible = Eligible;
         Filter = filter;
         Keyword = keyword;
         RedCount = eligible.Count(i => i.Status == ReorderStatus.Red);
@@ -25,6 +28,8 @@ public sealed class ReorderReport
     public IReadOnlyList<ReorderItem> Eligible { get; }
     public ReorderStatusFilter Filter { get; }
     public string? Keyword { get; }
+    /// <summary>Selected ED_NED code (ประเภทเวชภัณฑ์) or null for ทุกประเภท.</summary>
+    public string? ItemTypeCode { get; }
 
     /// <summary>Items matching the selected status filter.</summary>
     public IReadOnlyList<ReorderItem> Rows { get; }
@@ -40,8 +45,8 @@ public sealed class ReorderReport
     public int MissingMinCount => Eligible.Count(i => (i.MinLevel ?? 0m) == 0m);
     public int MissingMaxCount => Eligible.Count(i => (i.MaxLevel ?? 0m) == 0m);
 
-    public static ReorderReport Build(IReadOnlyList<ReorderItem> eligible, ReorderStatusFilter filter, string? keyword = null)
-        => new(eligible, filter, keyword);
+    public static ReorderReport Build(IReadOnlyList<ReorderItem> eligible, ReorderStatusFilter filter, string? keyword = null, string? itemTypeCode = null)
+        => new(eligible, filter, keyword, itemTypeCode);
 }
 
 /// <summary>Read-only source of eligible reorder rows (dbo.INV_MD).</summary>
@@ -53,4 +58,7 @@ public interface IReorderRepository
     /// optionally limited by a normalised keyword. Classification happens in Core.
     /// </summary>
     Task<IReadOnlyList<ReorderItem>> GetEligibleAsync(string? keyword, CancellationToken cancellationToken = default);
+
+    /// <summary>All ประเภทเวชภัณฑ์ rows of dbo.TBLED_NED (EDCODE order) for the type dropdown.</summary>
+    Task<IReadOnlyList<ItemType>> GetItemTypesAsync(CancellationToken cancellationToken = default);
 }

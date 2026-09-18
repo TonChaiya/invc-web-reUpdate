@@ -51,6 +51,10 @@
                         @if (!string.IsNullOrEmpty(item.Location)) { <span class="dot"></span><span>@item.Location</span> }
                         @if (item.HasNoThresholds) { <span class="dot"></span><span class="reorder-note" title="MIN_LEVEL และ MAX_LEVEL เป็น 0 หรือว่าง — ตั้งค่าในโปรแกรม Access">ยังไม่กำหนด MIN/MAX</span> }
                     </div>
+                    @if (!string.IsNullOrWhiteSpace(item.EdNedName))
+                    {
+                        <div class="ds-item-meta reorder-item-type">@item.EdNedName</div>
+                    }
                     <div class="ds-item-meta reorder-levels--mobile">
                         <span>MIN @min</span><span class="dot"></span><span>ROP @rop</span><span class="dot"></span><span>MAX @max</span>
                         @if (item.RatePerMonth is not null) { <span class="dot"></span><span>ใช้ @item.RatePerMonth.Value.ToString("N0")/เดือน</span> }

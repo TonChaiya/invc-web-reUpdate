@@ -181,15 +181,76 @@ public class ReorderSqlGuardTests
         var fields = type.GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
             .Where(f => f.FieldType == typeof(string) && f.Name != "EligibilityFilter").ToList();
 
-        Assert.Equal(2, fields.Count);
+        Assert.Equal(3, fields.Count);   // EligibleAll, EligibleSearch, ItemTypes
         foreach (var f in fields)
         {
             var sql = (string)f.GetValue(null)!;
             Assert.Equal(sql, ReadOnlySql.Ensure(sql));
             Assert.DoesNotContain("SELECT *", sql, StringComparison.OrdinalIgnoreCase);
+            if (f.Name == "ItemTypes")
+            {
+                Assert.Contains("FROM dbo.TBLED_NED", sql);
+                continue;
+            }
             Assert.Contains("(m.NOUSE IS NULL OR m.NOUSE = '')", sql, StringComparison.Ordinal);
             Assert.Contains("(m.OUT_OF_LIST IS NULL OR m.OUT_OF_LIST = '')", sql, StringComparison.Ordinal);
             Assert.DoesNotContain("ROP_EXCEPT", sql, StringComparison.OrdinalIgnoreCase);   // legacy did not filter it
+            // ประเภทเวชภัณฑ์ comes from INV_MD.ED_NED → TBLED_NED via OUTER APPLY TOP 1 (never a row-multiplying join); no ED_NED predicate in SQL
+            Assert.Contains("RTRIM(m.ED_NED)  AS EdNedCode", sql);
+            Assert.Contains("OUTER APPLY (SELECT TOP 1 x.EDNAME FROM dbo.TBLED_NED x WHERE x.EDCODE = m.ED_NED", sql);
+            Assert.DoesNotContain("@EdNed", sql, StringComparison.Ordinal);
+            Assert.DoesNotContain("GROUP_CODE", sql);          // กลุ่มยา is a different dimension, not part of this filter
         }
+    }
+}
+
+public class ReorderItemTypeTests
+{
+    private static readonly IReadOnlyList<ItemType> Types =
+    [
+        new("1", "ยาในบัญชียาหลักแห่งชาติ", "ED"), new("2", "ยานอกบัญชียาหลักแห่งชาติ", "NED"),
+        new("3", "วัสดุการแพทย์", "MES"), new("4", "วัสดุเภสัชกรรม", "EA"), new("5", "ยาตัวอย่างเพื่อทดลองใช้", "SAM"),
+    ];
+
+    private static ReorderItem Item(string code, string type, decimal stock, decimal min, decimal max)
+        => new() { WorkingCode = code, DrugName = "x " + code, QtyOnHand = stock, MinLevel = min, ReorderQty = min, MaxLevel = max,
+                   EdNedCode = type, EdNedName = Types.First(t => t.Code == type).Name };
+
+    [Theory]
+    [InlineData("1", "1")] [InlineData(" 3 ", "3")] [InlineData("", null)] [InlineData(null, null)]
+    [InlineData("9", null)] [InlineData("12", null)] [InlineData("ED", null)]
+    public void NormalizeCode_accepts_only_known_single_character_codes(string? raw, string? expected)
+        => Assert.Equal(expected, ItemType.NormalizeCode(raw, Types));
+
+    [Fact]
+    public void DisplayLabel_is_code_dash_name()
+        => Assert.Equal("1 — ยาในบัญชียาหลักแห่งชาติ", Types[0].DisplayLabel);
+
+    [Fact]
+    public void Type_filter_composes_with_status_without_changing_classification_or_formulas()
+    {
+        IReadOnlyList<ReorderItem> items =
+        [
+            Item("A", "1", 10, 100, 150),   // red, type 1, suggest 140
+            Item("B", "3", 10, 100, 150),   // red, type 3
+            Item("C", "1", 300, 100, 150),  // green, type 1
+            Item("D", "2", 120, 100, 150),  // green, type 2
+        ];
+        var all = ReorderReport.Build(items, ReorderStatusFilter.Red);
+        Assert.Equal(2, all.RedCount); Assert.Equal(2, all.GreenCount); Assert.Equal(4, all.EligibleCount);
+
+        var type1 = ReorderReport.Build(items, ReorderStatusFilter.Red, itemTypeCode: "1");
+        Assert.Equal("1", type1.ItemTypeCode);
+        Assert.Equal(2, type1.EligibleCount);                    // counts describe the selected type
+        Assert.Equal(1, type1.RedCount); Assert.Equal(1, type1.GreenCount);
+        Assert.Single(type1.Rows); Assert.Equal("A", type1.Rows[0].WorkingCode);
+        Assert.Equal(140m, type1.Rows[0].SuggestedOrderQty);     // formula untouched
+        Assert.Equal(ReorderStatus.Red, type1.Rows[0].Status);
+        Assert.Equal(140m, type1.RedSuggestedTotal);
+
+        var type1All = ReorderReport.Build(items, ReorderStatusFilter.All, itemTypeCode: "1");
+        Assert.Equal(["A", "C"], type1All.Rows.Select(r => r.WorkingCode).OrderBy(c => c).ToArray());
+        var type5 = ReorderReport.Build(items, ReorderStatusFilter.All, itemTypeCode: "5");
+        Assert.Empty(type5.Rows); Assert.Equal(0, type5.EligibleCount);
     }
 }

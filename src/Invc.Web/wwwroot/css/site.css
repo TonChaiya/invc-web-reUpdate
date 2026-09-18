@@ -268,6 +268,7 @@ a.metric-card:hover { border-color: var(--app-primary); box-shadow: 0 2px 8px rg
 .reorder-suggested--attention { color: var(--danger); font-weight: 700; font-size: 1.08rem; }
 .reorder-suggested--none { color: var(--text-tertiary); font-weight: 400; font-size: .88rem; }
 .reorder-note { color: var(--warning); }
+.reorder-table .reorder-item-type { color: var(--text-tertiary); font-size: .78rem; margin-top: 0; }
 /* attention = thin left accent only; rows stay white */
 .reorder-row.is-red > td:first-child { box-shadow: inset 3px 0 0 var(--danger); }
 .reorder-row.is-yellow > td:first-child { box-shadow: inset 3px 0 0 #d9a32b; }

@@ -19,7 +19,7 @@
 <body class="print-body">
     <div class="no-print print-actions">
         <button type="button" class="ds-btn ds-btn-primary" onclick="window.print()">พิมพ์ / บันทึกเป็น PDF</button>
-        <a class="ds-btn ds-btn-secondary" asp-page="/Reorder/Index" asp-route-status="@Model.Filter.ToQueryValue()" asp-route-q="@Model.Keyword">กลับหน้าคำแนะนำการสั่งซื้อ</a>
+        <a class="ds-btn ds-btn-secondary" asp-page="/Reorder/Index" asp-route-status="@Model.Filter.ToQueryValue()" asp-route-q="@Model.Keyword" asp-route-type="@Model.ItemTypeCode">กลับหน้าคำแนะนำการสั่งซื้อ</a>
         <span class="print-hint">ใช้คำสั่งพิมพ์ของเบราว์เซอร์ (Ctrl+P) เพื่อบันทึกเป็น PDF · กระดาษ A4</span>
     </div>
 
@@ -28,6 +28,7 @@
         <h1 class="print-title">รายงานคำแนะนำการสั่งซื้อ</h1>
         <dl class="print-meta">
             <div><dt>สถานะ</dt><dd><strong>@Model.Filter.ThaiLabel()</strong></dd></div>
+            <div><dt>ประเภทเวชภัณฑ์</dt><dd>@(Model.SelectedItemType?.Name ?? "ทุกประเภท")</dd></div>
             @if (Model.Keyword is not null) { <div><dt>ค้นหา</dt><dd>“@Model.Keyword”</dd></div> }
             <div><dt>พิมพ์เมื่อ</dt><dd>@Model.GeneratedAt.ToString("d MMMM yyyy HH:mm")</dd></div>
         </dl>

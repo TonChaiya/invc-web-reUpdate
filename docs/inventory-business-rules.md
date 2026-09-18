@@ -30,6 +30,16 @@ Access application and must not be changed or "improved" by the new web applicat
 | Lots / expiry | `INV_MD_C` (PACK_RATIO, QTY_ON_HAND, EXPIRED_DATE, LOTNO, LOCATION, LOT_COST, LOT_VALUE) | 249 rows. |
 | Active-item filter | `INV_MD.NOUSE IS NULL` (267 items); reorder report also requires `OUT_OF_LIST IS NULL`; dashboards also exclude `PO_INDIVIDUAL IS NOT NULL` | At this site all three filters yield 267. |
 
+### 1a. Three classification dimensions — never merge them (owner clarification 2026-09-18)
+
+| Dimension | Column → lookup | Meaning | Used by |
+|---|---|---|---|
+| **ประเภทเวชภัณฑ์** | `INV_MD.ED_NED` (nchar(1)) → `dbo.TBLED_NED` (`EDCODE`, `EDNAME`, `EDMAP`, `EDTYPE`) | The "ประเภท" dropdown of INVC "สร้างรหัสยา". Live values: 1 ยาในบัญชียาหลักแห่งชาติ (ED), 2 ยานอกบัญชียาหลักแห่งชาติ (NED), 3 วัสดุการแพทย์ (MES), 4 วัสดุเภสัชกรรม (EA), 5 ยาตัวอย่างเพื่อทดลองใช้ (SAM). Active items 2026-09-18: 1 → 173, 2 → 8, 3 → 86. `SUPPLY_TYPE` is deprecated in INVC; `ED_NED` replaces it. | Inventory Status summary (ดูสรุปทุกหมวด), **Reorder type filter** (`?type=`), row metadata (EDNAME under the drug name) |
+| **กลุ่มยา** | `INV_MD.GROUP_CODE` (nvarchar(8)) → `dbo.[GROUP].CODE` / `NAME` | Pharmacological group (กลุ่มยาตามบัญชียาหลัก). | Not implemented yet — planned as a separate future enhancement; must not be confused with ED_NED |
+| **ที่เก็บ** | `INV_MD.LOCATION` (nvarchar(50), free text matched by name) | Storage location / shelf. | Inventory Status location dropdown (`?loc=`), row metadata |
+
+The Reorder type filter is applied in Core (`ReorderReport.Build(..., itemTypeCode)`) on the unchanged legacy eligibility query; the SQL only adds `ED_NED` + `EDNAME` (OUTER APPLY TOP 1) to the select list, so parity, classification and formulas are untouched.
+
 ## 2. Derived measures used by the legacy pages (keep verbatim)
 
 | Measure | Formula (legacy) | Where |

@@ -44,7 +44,7 @@
                 };
                 var active = Model.Filter == f;
                 <a class="reorder-tab @tone @(active ? "is-active" : "")"
-                   asp-page="/Reorder/Index" asp-route-status="@f.ToQueryValue()" asp-route-q="@Model.Keyword"
+                   asp-page="/Reorder/Index" asp-route-status="@f.ToQueryValue()" asp-route-q="@Model.Keyword" asp-route-type="@Model.ItemTypeCode"
                    aria-current="@(active ? "page" : null)">
                     <span class="reorder-tab-dot" aria-hidden="true"></span>
                     <span class="reorder-tab-label">@f.ThaiLabel()</span>
@@ -56,23 +56,34 @@
         @* toolbar — search keeps the status; print keeps status + keyword *@
         <form method="get" class="ds-toolbar reorder-toolbar" role="search" aria-label="ค้นหารายการ">
             <input type="hidden" name="status" value="@Model.Filter.ToQueryValue()" />
+            <label class="visually-hidden" for="type">ประเภทเวชภัณฑ์</label>
+            <select class="ds-select" id="type" name="type" aria-label="กรองตามประเภทเวชภัณฑ์">
+                <option value="">ทุกประเภท</option>
+                @foreach (var t in Model.ItemTypes)
+                {
+                    <option value="@t.Code" selected="@(t.Code == Model.ItemTypeCode)">@t.DisplayLabel</option>
+                }
+            </select>
             <label class="visually-hidden" for="q">ค้นหา</label>
             <input class="ds-input" type="search" id="q" name="q" value="@Model.Keyword"
                    maxlength="@Invc.Core.Inventory.SearchKeyword.MaxLength" autocomplete="off"
                    placeholder="ค้นหารหัสยา / ชื่อยา / ส่วนประกอบ" />
             <button class="ds-btn ds-btn-primary" type="submit">ค้นหา</button>
-            @if (Model.Keyword is not null)
+            @if (Model.Keyword is not null || Model.ItemTypeCode is not null)
             {
+                @* clears keyword + type, keeps the status *@
                 <a class="ds-btn ds-btn-secondary" asp-page="/Reorder/Index" asp-route-status="@Model.Filter.ToQueryValue()">ล้าง</a>
             }
             <a class="ds-btn ds-btn-secondary reorder-print" target="_blank" rel="noopener"
-               asp-page="/Reorder/Print" asp-route-status="@Model.Filter.ToQueryValue()" asp-route-q="@Model.Keyword">พิมพ์ / บันทึก PDF</a>
+               asp-page="/Reorder/Print" asp-route-status="@Model.Filter.ToQueryValue()" asp-route-q="@Model.Keyword" asp-route-type="@Model.ItemTypeCode">พิมพ์ / บันทึก PDF</a>
         </form>
 
         @* compact context of the selected status — one line of facts, threshold-quality warning kept separate *@
         <div class="reorder-context" aria-live="polite">
             <p class="reorder-context-main">
-                <strong>@Model.Filter.ThaiLabel()</strong> · @r.Rows.Count.ToString("N0") รายการ
+                <strong>@Model.Filter.ThaiLabel()</strong>
+                @if (Model.SelectedItemType is { } st) { <text>· @st.Name</text> }
+                · @r.Rows.Count.ToString("N0") รายการ
                 @if (Model.Keyword is not null) { <text>· ค้นหา “@Model.Keyword”</text> }
                 @if (Model.Filter == ReorderStatusFilter.Red && r.RedSuggestedTotal > 0)
                 {

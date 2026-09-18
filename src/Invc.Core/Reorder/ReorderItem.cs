@@ -29,6 +29,10 @@ public sealed record ReorderItem
     public string? Location { get; init; }
     public decimal? RatePerMonth { get; init; }
 
+    /// <summary>INV_MD.ED_NED (ประเภทเวชภัณฑ์ code, trimmed) and its TBLED_NED.EDNAME — presentation and type filter only.</summary>
+    public string? EdNedCode { get; init; }
+    public string? EdNedName { get; init; }
+
     /// <summary>Legacy: <c>If reorder = 0 Then reorder = minLv</c>.</summary>
     public decimal EffectiveReorderPoint => InventoryRules.EffectiveReorderPoint(ReorderQty, MinLevel);
 
