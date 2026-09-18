@@ -7,26 +7,10 @@
     var filters = new[] { ReorderStatusFilter.Red, ReorderStatusFilter.Yellow, ReorderStatusFilter.Green, ReorderStatusFilter.All };
 }
 
-<div class="page-header d-flex flex-wrap align-items-end justify-content-between gap-2">
-    <div>
-        <h1 class="h3 mb-0">คำแนะนำการสั่งซื้อ <span class="text-muted fs-6 fw-normal">Reorder Recommendations</span></h1>
-        <p class="text-muted mb-0">
-            เปรียบเทียบปริมาณคงคลังกับ MIN / จุดสั่งซื้อ / MAX ที่กำหนดไว้ในโปรแกรม Access
-            (รายการที่ใช้งานและอยู่ในบัญชี) — ไม่ใช่รายการใบสั่งซื้อจริง
-        </p>
-    </div>
-    <form method="get" class="d-flex gap-2 inv-search" role="search" aria-label="ค้นหารายการ">
-        <input type="hidden" name="status" value="@Model.Filter.ToQueryValue()" />
-        <label class="visually-hidden" for="q">ค้นหา</label>
-        <input class="form-control" type="search" id="q" name="q" value="@Model.Keyword"
-               maxlength="@Invc.Core.Inventory.SearchKeyword.MaxLength" autocomplete="off"
-               placeholder="รหัสยา / ชื่อยา / ส่วนประกอบ" />
-        <button class="btn btn-primary" type="submit">ค้นหา</button>
-        @if (Model.Keyword is not null)
-        {
-            <a class="btn btn-outline-secondary" asp-page="/Reorder/Index" asp-route-status="@Model.Filter.ToQueryValue()">ล้าง</a>
-        }
-    </form>
+@* 1. compact header — a recommendation report, never a purchase-order list *@
+<div class="page-header reorder-header">
+    <h1 class="h4 mb-0">คำแนะนำการสั่งซื้อ <span class="page-subtitle">Reorder Recommendations</span></h1>
+    <p class="text-muted small mb-0">เปรียบเทียบคงคลังกับ MIN / จุดสั่งซื้อ / MAX ที่กำหนดในโปรแกรม Access — เป็นคำแนะนำ ไม่ใช่รายการใบสั่งซื้อจริง</p>
 </div>
 
 @if (Model.HasError)
@@ -37,7 +21,8 @@
 }
 else if (Model.Report is { } r)
 {
-    <div class="row g-2 mb-3 inv-cards" role="group" aria-label="สรุปตามสถานะ">
+    @* 2. status strip — one compact navigation, counts inline, current state by aria-current + weight + border (not colour alone) *@
+    <nav class="reorder-status-strip" aria-label="เลือกสถานะ">
         @foreach (var f in filters)
         {
             var count = f switch
@@ -49,51 +34,59 @@ else if (Model.Report is { } r)
             };
             var tone = f switch
             {
-                ReorderStatusFilter.Red => "border-danger",
-                ReorderStatusFilter.Yellow => "border-warning",
-                ReorderStatusFilter.Green => "border-success",
-                _ => "border-secondary",
+                ReorderStatusFilter.Red => "is-red",
+                ReorderStatusFilter.Yellow => "is-yellow",
+                ReorderStatusFilter.Green => "is-green",
+                _ => "is-all",
             };
-            var label = f == ReorderStatusFilter.All ? "รายการที่เข้าเกณฑ์ทั้งหมด" : f.ThaiLabel();
-            <div class="col-6 col-md-3">
-                <a class="card h-100 text-decoration-none text-reset @tone @(Model.Filter == f ? "reorder-card-active" : "")"
-                   asp-page="/Reorder/Index" asp-route-status="@f.ToQueryValue()" asp-route-q="@Model.Keyword"
-                   aria-current="@(Model.Filter == f ? "page" : null)">
-                    <div class="card-body py-2">
-                        <div class="text-muted small">@label</div>
-                        <div class="fs-4 fw-semibold">@count.ToString("N0")</div>
-                    </div>
-                </a>
-            </div>
+            var active = Model.Filter == f;
+            <a class="reorder-status-option @tone @(active ? "is-active" : "")"
+               asp-page="/Reorder/Index" asp-route-status="@f.ToQueryValue()" asp-route-q="@Model.Keyword"
+               aria-current="@(active ? "page" : null)">
+                <span class="reorder-status-mark" aria-hidden="true"></span>
+                <span class="reorder-status-label">@f.ThaiLabel()</span>
+                <span class="reorder-status-count">@count.ToString("N0")</span>
+            </a>
         }
-    </div>
+    </nav>
 
-    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-        <p class="mb-0" aria-live="polite">
-            สถานะ <strong>@Model.Filter.ThaiLabel()</strong>
-            @if (Model.Keyword is not null) { <text>· ค้นหา “<strong>@Model.Keyword</strong>”</text> }
-            · แสดง <strong>@r.Rows.Count.ToString("N0")</strong> รายการ
-            @if (r.MissingMinCount > 0)
-            {
-                <span class="text-muted">· @r.MissingMinCount.ToString("N0") รายการยังไม่ได้กำหนด MIN, @r.MissingMaxCount.ToString("N0") รายการยังไม่ได้กำหนด MAX</span>
-            }
-        </p>
-        <a class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener"
-           asp-page="/Reorder/Print" asp-route-status="@Model.Filter.ToQueryValue()" asp-route-q="@Model.Keyword">
-            พิมพ์ / บันทึกเป็น PDF
-        </a>
-    </div>
+    @* 3. toolbar — search keeps the status; print keeps status + keyword *@
+    <form method="get" class="reorder-toolbar" role="search" aria-label="ค้นหารายการ">
+        <input type="hidden" name="status" value="@Model.Filter.ToQueryValue()" />
+        <label class="visually-hidden" for="q">ค้นหา</label>
+        <input class="form-control form-control-sm" type="search" id="q" name="q" value="@Model.Keyword"
+               maxlength="@Invc.Core.Inventory.SearchKeyword.MaxLength" autocomplete="off"
+               placeholder="รหัสยา / ชื่อยา / ส่วนประกอบ" />
+        <button class="btn btn-primary btn-sm" type="submit">ค้นหา</button>
+        @if (Model.Keyword is not null)
+        {
+            <a class="btn btn-outline-secondary btn-sm" asp-page="/Reorder/Index" asp-route-status="@Model.Filter.ToQueryValue()">ล้าง</a>
+        }
+        <a class="btn btn-outline-secondary btn-sm reorder-print" target="_blank" rel="noopener"
+           asp-page="/Reorder/Print" asp-route-status="@Model.Filter.ToQueryValue()" asp-route-q="@Model.Keyword">พิมพ์ / บันทึก PDF</a>
+    </form>
 
+    @* 4. result context — one line; threshold quality stays secondary *@
+    <p class="reorder-result-meta" aria-live="polite">
+        <strong>@Model.Filter.ThaiLabel()</strong> · @r.Rows.Count.ToString("N0") รายการ
+        @if (Model.Keyword is not null) { <text>· ค้นหา “@Model.Keyword”</text> }
+        @if (r.MissingMinCount > 0 || r.MissingMaxCount > 0)
+        {
+            <span class="reorder-result-note">· ยังไม่กำหนด MIN @r.MissingMinCount.ToString("N0") รายการ, MAX @r.MissingMaxCount.ToString("N0") รายการ (ตั้งค่าในโปรแกรม Access)</span>
+        }
+    </p>
+
+    @* 5. the work: result table *@
     @if (r.Rows.Count == 0)
     {
-        <div class="alert alert-secondary" role="status">
+        <div class="empty-state" role="status">
             @if (r.EligibleCount == 0)
             {
                 <text>ไม่มีรายการที่เข้าเกณฑ์@(Model.Keyword is null ? "" : $" สำหรับ “{Model.Keyword}”")</text>
             }
             else if (Model.Filter == ReorderStatusFilter.Yellow)
             {
-                <text>ไม่มีรายการในสถานะ “ใกล้ถึงจุดสั่งซื้อ” — เมื่อจุดสั่งซื้อเท่ากับ MIN ช่วงนี้จะว่างเสมอ (ดูคำอธิบายด้านล่าง)</text>
+                <text>ไม่มีรายการในสถานะ “ใกล้ถึงจุดสั่งซื้อ” — เมื่อจุดสั่งซื้อเท่ากับ MIN ช่วงนี้จะว่างเสมอ (ดูเกณฑ์ด้านล่าง)</text>
             }
             else
             {
@@ -106,7 +99,8 @@ else if (Model.Report is { } r)
         <partial name="_ReorderTable" model="r" />
     }
 
-    <details class="mt-3 text-muted small">
+    @* 6. explanation — below the work area, collapsed *@
+    <details class="reorder-help text-muted small">
         <summary>เกณฑ์การจัดสถานะ (ตามโปรแกรมเดิม INV_Report_Purchase)</summary>
         <ul class="mb-0 mt-2">
             <li><strong>ต้องสั่งซื้อทันที</strong>: คงคลัง &lt; MIN</li>

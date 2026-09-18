@@ -1,26 +1,28 @@
 @using Invc.Core.Inventory
 @using Invc.Core.Reorder
 @model ReorderReport
-@{
-    var print = ViewData["Print"] is true;
-}
-<div class="@(print ? "" : "table-responsive inv-table-wrap")">
-    <table class="table table-sm align-middle inv-table reorder-table @(print ? "table-bordered" : "table-striped table-hover")">
+@*
+    Screen table for /Reorder (table-first). Column hierarchy:
+      1: drug + code · unit, stock, suggested order, status
+      2: MIN / reorder point / MAX   (own columns from md up; folded into the name sub-line below md)
+      3: rate per month, months of stock (lg up only)
+    Attention rows (RED) get a thin left accent + light tint; status is always text.
+*@
+<div class="table-responsive reorder-table-wrap">
+    <table class="table table-sm table-hover align-middle inv-table reorder-table">
         <caption class="visually-hidden">คำแนะนำการสั่งซื้อ สถานะ @Model.Filter.ThaiLabel()</caption>
         <thead class="table-light">
             <tr>
                 <th scope="col" class="text-end inv-col-no">#</th>
-                <th scope="col">รหัส</th>
-                <th scope="col">รายการ</th>
+                <th scope="col" class="reorder-col-item">รายการยา</th>
                 <th scope="col" class="text-end">คงคลัง</th>
-                <th scope="col" class="text-center">หน่วย</th>
-                <th scope="col" class="text-end">MIN</th>
-                <th scope="col" class="text-end">จุดสั่งซื้อ</th>
-                <th scope="col" class="text-end">MAX</th>
+                <th scope="col" class="text-end d-none d-md-table-cell">MIN</th>
+                <th scope="col" class="text-end d-none d-md-table-cell">จุดสั่งซื้อ</th>
+                <th scope="col" class="text-end d-none d-md-table-cell">MAX</th>
                 <th scope="col" class="text-end">แนะนำสั่ง</th>
-                <th scope="col" class="text-end">อัตราใช้/เดือน</th>
-                <th scope="col" class="text-end">เหลือใช้ (เดือน)</th>
-                <th scope="col" class="text-center">สถานะ</th>
+                <th scope="col" class="reorder-col-status">สถานะ</th>
+                <th scope="col" class="text-end d-none d-lg-table-cell">อัตราใช้/เดือน</th>
+                <th scope="col" class="text-end d-none d-lg-table-cell">เหลือใช้ (เดือน)</th>
             </tr>
         </thead>
         <tbody>
@@ -28,48 +30,42 @@
         @foreach (var item in Model.Rows)
         {
             n++;
-            var badge = item.Status switch
+            var isRed = item.Status == ReorderStatus.Red;
+            var statusClass = item.Status switch
             {
-                ReorderStatus.Red => "text-bg-danger",
-                ReorderStatus.Yellow => "text-bg-warning text-dark",
-                _ => "text-bg-success",
+                ReorderStatus.Red => "reorder-status-red",
+                ReorderStatus.Yellow => "reorder-status-yellow",
+                _ => "reorder-status-green",
             };
             var suggested = item.DisplaySuggestedQty();
-            <tr>
+            var min = (item.MinLevel ?? 0m).ToString("N0");
+            var rop = item.EffectiveReorderPoint.ToString("N0");
+            var max = (item.MaxLevel ?? 0m).ToString("N0");
+            <tr class="@(isRed ? "reorder-row-attention" : null)">
                 <td class="text-end text-muted">@n</td>
-                <td class="inv-code">@item.WorkingCode</td>
-                <td>
-                    @if (print)
-                    {
-                        @item.DrugName
-                    }
-                    else
-                    {
-                        <a asp-page="/Inventory/Detail" asp-route-workingCode="@item.WorkingCode">@item.DrugName</a>
-                    }
-                    @if (item.HasNoThresholds)
-                    {
-                        <span class="badge text-bg-light border text-muted ms-1" title="MIN_LEVEL และ MAX_LEVEL เป็น 0 หรือว่าง — ยังไม่ได้กำหนดในโปรแกรม Access">ไม่ได้กำหนด MIN/MAX</span>
-                    }
+                <td class="reorder-col-item">
+                    <a class="reorder-item-name" asp-page="/Inventory/Detail" asp-route-workingCode="@item.WorkingCode">@item.DrugName</a>
+                    <span class="reorder-item-sub">
+                        <span class="inv-code">@item.WorkingCode</span>@(string.IsNullOrEmpty(item.SaleUnit) ? "" : $" · {item.SaleUnit}")<span class="d-md-none"> · MIN @min / ROP @rop / MAX @max</span>@if (item.HasNoThresholds) { <span class="reorder-note" title="MIN_LEVEL และ MAX_LEVEL เป็น 0 หรือว่าง — ตั้งค่าในโปรแกรม Access"> · ยังไม่กำหนด MIN/MAX</span> }
+                    </span>
                 </td>
                 <td class="text-end">@((item.QtyOnHand ?? 0m).ToString("N0"))</td>
-                <td class="text-center">@item.SaleUnit</td>
-                <td class="text-end">@((item.MinLevel ?? 0m).ToString("N0"))</td>
-                <td class="text-end">@item.EffectiveReorderPoint.ToString("N0")</td>
-                <td class="text-end">@((item.MaxLevel ?? 0m).ToString("N0"))</td>
-                <td class="text-end @(item.Status == ReorderStatus.Red ? "fw-semibold" : "")">
-                    @if (suggested <= 0m && item.Status != ReorderStatus.Red)
+                <td class="text-end d-none d-md-table-cell">@min</td>
+                <td class="text-end d-none d-md-table-cell">@rop</td>
+                <td class="text-end d-none d-md-table-cell">@max</td>
+                <td class="text-end">
+                    @if (suggested <= 0m && !isRed)
                     {
-                        <span class="text-muted" title="ค่าดิบตามสูตร: @item.SuggestedOrderQty.ToString("N0")">ไม่ต้องสั่ง</span>
+                        <span class="reorder-suggested reorder-suggested-none" title="ค่าดิบตามสูตร: @item.SuggestedOrderQty.ToString("N0")">ไม่ต้องสั่ง</span>
                     }
                     else
                     {
-                        @suggested.ToString("N0")
+                        <span class="reorder-suggested @(isRed ? "reorder-suggested-attention" : "")">@suggested.ToString("N0")</span>
                     }
                 </td>
-                <td class="text-end">@(item.RatePerMonth?.ToString("N0"))</td>
-                <td class="text-end">@item.MonthsOfStockDisplay</td>
-                <td class="text-center"><span class="badge @badge reorder-badge">@item.Status.ThaiLabel()</span></td>
+                <td class="reorder-col-status"><span class="reorder-status @statusClass">@item.Status.ThaiLabel()</span></td>
+                <td class="text-end d-none d-lg-table-cell">@(item.RatePerMonth?.ToString("N0"))</td>
+                <td class="text-end d-none d-lg-table-cell">@item.MonthsOfStockDisplay</td>
             </tr>
         }
         </tbody>
