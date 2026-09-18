@@ -48,6 +48,7 @@ dl.print-totals { padding: 6px 0 8px; border-bottom: 1px solid #999; margin-bott
 .print-section-title { font-size: 12.5px; font-weight: 700; margin: 10px 0 4px; padding-bottom: 2px; border-bottom: 1px solid #999; color: #000; }
 .print-kv { margin: 0; display: grid; gap: 2px; font-size: 11.5px; }
 .print-kv div { display: grid; grid-template-columns: 9.5em minmax(0, 1fr); gap: 6px; }
+.print-kv--two { grid-template-columns: 1fr 1fr; column-gap: 24px; }
 .print-kv dt { color: #555; font-weight: 400; }
 .print-kv dd { margin: 0; color: #000; }
 .print-receipt { margin-top: 8px; break-inside: avoid; page-break-inside: avoid; }

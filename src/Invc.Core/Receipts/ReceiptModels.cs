@@ -127,6 +127,16 @@ public sealed class ReceiptReport
     public decimal TotalValue => Headers.Sum(h => h.TotalValue ?? 0m);
     public int TypeCount => TypeBreakdown.Count;
 
+    /// <summary>
+    /// Selected-context aggregates (presentation only, 2026-09-18): describe the CURRENT filtered rows (type filter applied)
+    /// so the page's summary never silently shows year-wide totals while one type is selected. Same source values, just
+    /// summed over <see cref="Rows"/> instead of <see cref="Headers"/>.
+    /// </summary>
+    public int SelectedHeaderCount => Rows.Count;
+    public int SelectedLineCount => Rows.Sum(h => h.LineCount);
+    public decimal SelectedQty => Rows.Sum(h => h.LineQtySum);
+    public decimal SelectedTotalValue => Rows.Sum(h => h.TotalValue ?? 0m);
+
     public static ReceiptReport Build(int fiscalYear, IReadOnlyList<NonPoReceiptSummary> headers, string? typeCode, string? keyword)
         => new(fiscalYear, headers, typeCode, keyword);
 }

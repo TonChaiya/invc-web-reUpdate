@@ -5,27 +5,33 @@
     ViewData["HideNavSearch"] = true;
 }
 
-<nav aria-label="breadcrumb">
-    <ol class="breadcrumb mb-2">
-        <li class="breadcrumb-item"><a asp-page="/Receipts/Index" asp-route-fy="@Model.Receipt?.Header.FiscalYear">รับเข้าอื่น / รับจาก CUP</a></li>
-        <li class="breadcrumb-item active" aria-current="page">@Model.ReceiveNo</li>
-    </ol>
-</nav>
+<div class="receipts-page receipt-detail ds-page">
+    <nav class="ds-breadcrumb" aria-label="breadcrumb">
+        <a asp-page="/Receipts/Index" asp-route-fy="@Model.Receipt?.Header.FiscalYear">รับเข้าอื่น / รับจาก CUP</a> <span aria-hidden="true">/</span> <span>@Model.ReceiveNo</span>
+    </nav>
 
-@if (Model.HasError)
-{
-    <div class="alert alert-danger" role="alert">
-        ไม่สามารถอ่านข้อมูลใบรับเข้าจากฐานข้อมูล INV ได้ กรุณาตรวจสอบหน้า <a asp-page="/Health" class="alert-link">สถานะระบบ</a>
-    </div>
-}
-else if (Model.Receipt is { } receipt)
-{
-    <div class="page-header d-flex flex-wrap align-items-start justify-content-between gap-2">
-        <div>
-            <h1 class="h3 mb-0">ใบรับเข้า <span class="inv-code">@receipt.Header.ReceiveNo</span> <span class="text-muted fs-6 fw-normal">(ไม่อ้างอิงใบสั่งซื้อ)</span></h1>
-            <p class="text-muted mb-0">@receipt.Header.TypeDisplayName · @receipt.Header.SourceDisplayName · @(receipt.Header.DateReceive?.ToString("d MMMM yyyy"))</p>
+    @if (Model.HasError)
+    {
+        <div class="ds-error" role="alert">
+            ไม่สามารถอ่านข้อมูลใบรับเข้าจากฐานข้อมูล INV ได้ กรุณาตรวจสอบหน้า <a asp-page="/Health">สถานะระบบ</a>
         </div>
-        <a class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener" asp-page="/Receipts/Print" asp-route-receiveNo="@receipt.Header.ReceiveNo">พิมพ์ / บันทึกเป็น PDF</a>
-    </div>
-    <partial name="_ReceiptBody" model="receipt" />
-}
+    }
+    else if (Model.Receipt is { } receipt)
+    {
+        var h = receipt.Header;
+        <div class="ds-page-header receipt-detail-header">
+            <div>
+                <h1 class="ds-page-title receipt-number">@h.ReceiveNo</h1>
+                <p class="receipt-detail-type"><span class="receipt-type-code">@h.TypeCode</span> @h.TypeDisplayName</p>
+                <p class="receipt-detail-source">@h.SourceDisplayName@(h.SourceName is not null && h.SourceCode is not null ? $" · {h.SourceCode}" : "")<span class="receipt-detail-date">@(h.DateReceive?.ToString("d MMMM yyyy") ?? "ไม่ระบุวันที่รับ")</span></p>
+                <p class="ds-identity receipt-identity">
+                    <span>เอกสาร @(string.IsNullOrWhiteSpace(h.InvoiceNo) ? "–" : h.InvoiceNo)</span>
+                    <span class="dot"></span><span>วันที่เอกสาร @(h.InvoiceDate?.ToString("d MMM yyyy") ?? "–")</span>
+                    <span class="dot"></span><span>ปีงบ @(h.FiscalYear?.ToString() ?? "–")</span>
+                </p>
+            </div>
+            <a class="ds-btn ds-btn-secondary" target="_blank" rel="noopener" asp-page="/Receipts/Print" asp-route-receiveNo="@h.ReceiveNo">พิมพ์ / บันทึก PDF</a>
+        </div>
+        <partial name="_ReceiptBody" model="receipt" />
+    }
+</div>

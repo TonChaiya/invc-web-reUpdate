@@ -4,158 +4,171 @@
 @{
     ViewData["Title"] = "รับเข้าอื่น / รับจาก CUP";
     ViewData["HideNavSearch"] = true;
+    var selectedType = Model.TypeCode is null ? null : Model.TypeOptions.FirstOrDefault(t => t.Code == Model.TypeCode);
 }
 
-<div class="page-header d-flex flex-wrap align-items-end justify-content-between gap-2">
-    <div>
-        <h1 class="h3 mb-0">รายการรับเข้าอื่น / รับจาก CUP <span class="text-muted fs-6 fw-normal">Non-PO Receipts</span></h1>
-        <p class="text-muted mb-0">การรับเข้าคลังที่<strong>ไม่อ้างอิงใบสั่งซื้อ</strong> (เบิกจากแม่ข่าย CUP, ยืม, คืนจากหน่วยเบิก, บริจาค, วัคซีน EPI, รับยาครั้งแรก) จากตาราง OTH_IVO — ใบสั่งซื้อจริงดูที่หน้า <a asp-page="/PurchaseOrders/Index">ใบสั่งซื้อ</a></p>
+<div class="receipts-page ds-page">
+    <div class="ds-page-header receipts-header">
+        <div>
+            <h1 class="ds-page-title">รับเข้าอื่น / รับจาก CUP</h1>
+            <p class="ds-page-subtitle">รายการรับเข้าที่ไม่อ้างอิงใบสั่งซื้อจาก INVC</p>
+        </div>
+        <div class="ds-page-context">ข้อมูลจาก OTH_IVO / OTH_IVOC · อ่านอย่างเดียว</div>
     </div>
-    <form method="get" class="d-flex flex-wrap gap-2 inv-search" role="search" aria-label="เลือกปีงบประมาณ ประเภท และค้นหา">
-        <label class="visually-hidden" for="fy">ปีงบประมาณ</label>
-        <select class="form-select w-auto" id="fy" name="fy" onchange="this.form.submit()">
-            @foreach (var y in Model.FiscalYearOptions)
+
+    @if (Model.HasError)
+    {
+        <div class="ds-error" role="alert">
+            ไม่สามารถอ่านข้อมูลการรับเข้าจากฐานข้อมูล INV ได้ กรุณาตรวจสอบหน้า <a asp-page="/Health">สถานะระบบ</a>
+        </div>
+    }
+    else if (Model.Report is { } r)
+    {
+        @* one toolbar: year · type (the ONE category control) · search; year/type submit on change and keep each other + keyword *@
+        <form method="get" class="ds-toolbar receipts-toolbar" role="search" aria-label="เลือกปีงบประมาณ ประเภท และค้นหา">
+            <label class="visually-hidden" for="fy">ปีงบประมาณ</label>
+            <select class="ds-select" id="fy" name="fy" aria-label="ปีงบประมาณ" onchange="this.form.submit()">
+                @foreach (var y in Model.FiscalYearOptions)
+                {
+                    <option value="@y" selected="@(y == Model.FiscalYear)">ปีงบ @y</option>
+                }
+            </select>
+            <label class="visually-hidden" for="type">ประเภทการรับ</label>
+            <select class="ds-select" id="type" name="type" aria-label="ประเภทการรับ" onchange="this.form.submit()">
+                <option value="all" selected="@(Model.TypeCode is null)">ทุกประเภท</option>
+                @foreach (var t in Model.TypeOptions)
+                {
+                    <option value="@t.Code" selected="@(t.Code == Model.TypeCode)">@t.Code — @t.DisplayName</option>
+                }
+            </select>
+            <label class="visually-hidden" for="q">ค้นหา</label>
+            <input class="ds-input" type="search" id="q" name="q" value="@Model.Keyword"
+                   maxlength="@Invc.Core.Inventory.SearchKeyword.MaxLength" autocomplete="off"
+                   placeholder="ค้นหาเลขที่ใบรับ / เอกสาร / แหล่งที่มา" />
+            <button class="ds-btn ds-btn-primary" type="submit">ค้นหา</button>
+            @if (Model.Keyword is not null || Model.TypeCode is not null)
             {
-                <option value="@y" selected="@(y == Model.FiscalYear)">ปีงบ @y</option>
+                @* clears keyword + type, keeps the fiscal year *@
+                <a class="ds-btn ds-btn-secondary" asp-page="/Receipts/Index" asp-route-fy="@Model.FiscalYear">ล้าง</a>
             }
-        </select>
-        <label class="visually-hidden" for="type">ประเภทการรับ</label>
-        <select class="form-select w-auto" id="type" name="type" onchange="this.form.submit()">
-            <option value="all" selected="@(Model.TypeCode is null)">ทุกประเภท</option>
-            @foreach (var t in Model.TypeOptions)
-            {
-                <option value="@t.Code" selected="@(t.Code == Model.TypeCode)">@t.Code @t.DisplayName</option>
-            }
-        </select>
-        <label class="visually-hidden" for="q">ค้นหา</label>
-        <input class="form-control" type="search" id="q" name="q" value="@Model.Keyword"
-               maxlength="@Invc.Core.Inventory.SearchKeyword.MaxLength" autocomplete="off"
-               placeholder="เลขที่ใบรับ / เลขที่เอกสาร / แหล่งที่มา / ประเภท" />
-        <button class="btn btn-primary" type="submit">ค้นหา</button>
-        @if (Model.Keyword is not null || Model.TypeCode is not null)
+        </form>
+
+        @if (Model.PeriodNote is not null)
         {
-            <a class="btn btn-outline-secondary" asp-page="/Receipts/Index" asp-route-fy="@Model.FiscalYear">ล้าง</a>
+            <p class="ds-warning" role="status">@Model.PeriodNote</p>
         }
-    </form>
+
+        @* context describes the CURRENT filtered result (selected type), never the year-wide totals *@
+        <p class="receipts-context" aria-live="polite">
+            ปีงบ <strong>@r.FiscalYear</strong>
+            @if (selectedType is not null) { <text>· <strong>@selectedType.DisplayName</strong></text> }
+            else if (Model.TypeCode is not null) { <text>· <strong>ประเภท @Model.TypeCode</strong></text> }
+            · @r.SelectedHeaderCount.ToString("N0") ใบ
+            · @r.SelectedLineCount.ToString("N0") รายการ
+            · จำนวน @r.SelectedQty.ToString("N0") หน่วย
+            · มูลค่า @r.SelectedTotalValue.ToString("N2") บาท
+            @if (Model.Keyword is not null) { <text>· ค้นหา “@Model.Keyword”</text> }
+            @if (Model.TypeCode is not null) { <span class="receipts-context-sub">จากทั้งหมด @r.HeaderCount.ToString("N0") ใบในปีนี้</span> }
+        </p>
+
+        @if (r.Rows.Count == 0)
+        {
+            <div class="ds-empty" role="status">
+                @if (r.HeaderCount == 0) { <text>ยังไม่มีรายการรับเข้าในปีงบประมาณ @r.FiscalYear@(Model.Keyword is null ? "" : $" ที่ตรงกับ “{Model.Keyword}”")</text> }
+                else { <text>ไม่มีใบรับในเงื่อนไขนี้</text> }
+            </div>
+        }
+        else
+        {
+            var showType = Model.TypeCode is null;
+            <div class="ds-list receipt-list">
+                <table class="ds-table receipt-table">
+                    <caption class="visually-hidden">ใบรับเข้าอื่น ปีงบ @r.FiscalYear</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col" class="ds-col-no">#</th>
+                            <th scope="col">ใบรับ</th>
+                            <th scope="col" class="receipt-col-source">@(showType ? "ประเภท / แหล่งที่มา" : "แหล่งที่มา")</th>
+                            <th scope="col" class="ds-col-num receipt-col-qty">จำนวน</th>
+                            <th scope="col" class="ds-col-num">มูลค่า (บาท)</th>
+                            <th scope="col" class="receipt-col-date ds-col-secondary">วันที่รับ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @{ var n = 0; }
+                    @foreach (var h in r.Rows)
+                    {
+                        n++;
+                        <tr class="ds-row receipt-row">
+                            <td class="ds-col-no">@n</td>
+                            <td class="ds-item-main receipt-cell-number">
+                                <a class="ds-item-name receipt-number" asp-page="/Receipts/Detail" asp-route-receiveNo="@h.ReceiveNo">@h.ReceiveNo</a>
+                                <div class="ds-item-meta receipt-meta">
+                                    <span class="receipt-meta-date">@(h.DateReceive?.ToString("d MMM yyyy") ?? "ไม่ระบุวันที่")</span>
+                                    @if (!string.IsNullOrWhiteSpace(h.InvoiceNo)) { <span class="dot"></span><span>เอกสาร @h.InvoiceNo</span> }
+                                </div>
+                                <div class="ds-item-meta receipt-meta receipt-meta--mobile">
+                                    @if (showType) { <span class="receipt-type"><span class="receipt-type-code">@h.TypeCode</span> @h.TypeDisplayName</span><span class="dot"></span> }
+                                    <span class="receipt-source">@h.SourceDisplayName</span>
+                                    @if (h.SourceName is not null && h.SourceCode is not null) { <span class="dot"></span><span class="ds-code">@h.SourceCode</span> }
+                                </div>
+                            </td>
+                            <td class="receipt-col-source">
+                                @if (showType)
+                                {
+                                    <div class="receipt-type"><span class="receipt-type-code">@h.TypeCode</span> @h.TypeDisplayName</div>
+                                }
+                                <div class="receipt-source">@h.SourceDisplayName</div>
+                                @if (h.SourceName is not null && h.SourceCode is not null) { <div class="ds-item-meta"><span class="ds-code">@h.SourceCode</span></div> }
+                            </td>
+                            <td class="ds-col-num receipt-col-qty">
+                                <div class="ds-number receipt-qty">@h.LineQtySum.ToString("N0") <small>หน่วย</small></div>
+                                <div class="receipt-items">@h.LineCount.ToString("N0") รายการ</div>
+                            </td>
+                            <td class="ds-col-num ds-number receipt-value">@(h.TotalValue?.ToString("N2") ?? "–")</td>
+                            <td class="receipt-col-date ds-col-secondary ds-tabular">@(h.DateReceive?.ToString("d MMM yyyy") ?? "–")</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        @if (r.TypeBreakdown.Count > 0)
+        {
+            <details class="ds-help receipts-breakdown">
+                <summary>ดูสรุปทุกประเภท (ปีงบ @r.FiscalYear)</summary>
+                <table class="ds-table inventory-table--compact receipts-breakdown-table mt-2">
+                    <caption class="visually-hidden">แยกตามประเภทการรับ ปีงบ @r.FiscalYear</caption>
+                    <thead><tr>
+                        <th scope="col">ประเภท</th><th scope="col">ชื่อประเภท</th>
+                        <th scope="col" class="ds-col-num">ใบรับ</th><th scope="col" class="ds-col-num">รายการ</th><th scope="col" class="ds-col-num">มูลค่า (บาท)</th>
+                    </tr></thead>
+                    <tbody>
+                    @foreach (var t in r.TypeBreakdown)
+                    {
+                        <tr>
+                            <td class="ds-code">@t.Code</td>
+                            <td>@t.DisplayName</td>
+                            <td class="ds-col-num ds-number">@t.HeaderCount.ToString("N0")</td>
+                            <td class="ds-col-num ds-number">@t.LineCount.ToString("N0")</td>
+                            <td class="ds-col-num ds-number">@t.TotalValue.ToString("N2")</td>
+                        </tr>
+                    }
+                    </tbody>
+                    <tfoot><tr><td colspan="2">รวมทุกประเภท</td><td class="ds-col-num ds-number">@r.HeaderCount.ToString("N0")</td><td class="ds-col-num ds-number">@r.LineCount.ToString("N0")</td><td class="ds-col-num ds-number">@r.TotalValue.ToString("N2")</td></tr></tfoot>
+                </table>
+            </details>
+        }
+
+        <details class="ds-help receipts-help">
+            <summary>ที่มาของข้อมูล</summary>
+            <ul class="mb-0 mt-2">
+                <li>การรับเข้าคลังที่ไม่อ้างอิงใบสั่งซื้อ (เบิกจากแม่ข่าย CUP, ยืม, คืนจากหน่วยเบิก, บริจาค, วัคซีน EPI, รับยาครั้งแรก) — ใบสั่งซื้อจริงดูที่หน้า <a asp-page="/PurchaseOrders/Index">ใบสั่งซื้อ</a></li>
+                <li>หัวใบรับ = OTH_IVO (คีย์ RECEIVE_NO), รายการ = OTH_IVOC (RECEIVE_NO เดียวกัน), ประเภท = RCV_TYPE, แหล่งที่มา = DPT_CODE → COMPANY</li>
+                <li>ปีงบประมาณอ่านจากวันที่รับ (DATE_RECEIVE): 1 ต.ค. – 30 ก.ย.</li>
+                <li>มูลค่า = TOTAL_VALUE ของหัวใบรับ (= Σ UNIT_VALUE × จำนวน ÷ ขนาดบรรจุ ของรายการ) — ประเภทยืม/บริจาค/คืนมักบันทึกเป็น 0</li>
+            </ul>
+        </details>
+    }
 </div>
-
-@if (Model.HasError)
-{
-    <div class="alert alert-danger" role="alert">
-        ไม่สามารถอ่านข้อมูลการรับเข้าจากฐานข้อมูล INV ได้ กรุณาตรวจสอบหน้า <a asp-page="/Health" class="alert-link">สถานะระบบ</a>
-    </div>
-}
-else if (Model.Report is { } r)
-{
-    @if (Model.PeriodNote is not null)
-    {
-        <div class="alert alert-warning py-2" role="status">@Model.PeriodNote</div>
-    }
-
-    <div class="row g-2 mb-3 inv-cards">
-        <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body py-2">
-            <div class="text-muted small">ใบรับเข้า (ปีงบ @r.FiscalYear)</div>
-            <div class="fs-4 fw-semibold">@r.HeaderCount.ToString("N0") <span class="fs-6 fw-normal text-muted">ใบ</span></div>
-        </div></div></div>
-        <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body py-2">
-            <div class="text-muted small">รายการ (บรรทัด)</div>
-            <div class="fs-4 fw-semibold">@r.LineCount.ToString("N0")</div>
-        </div></div></div>
-        <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body py-2">
-            <div class="text-muted small">ประเภทการรับที่พบ</div>
-            <div class="fs-4 fw-semibold">@r.TypeCount.ToString("N0")</div>
-        </div></div></div>
-        <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body py-2">
-            <div class="text-muted small">มูลค่ารวม (บาท) <span title="OTH_IVO.TOTAL_VALUE — ประเภทยืม/บริจาค/คืน มักบันทึกเป็น 0">ⓘ</span></div>
-            <div class="fs-4 fw-semibold">@r.TotalValue.ToString("N2")</div>
-        </div></div></div>
-    </div>
-
-    @if (r.TypeBreakdown.Count > 0)
-    {
-        <div class="table-responsive mb-3">
-            <table class="table table-sm w-auto mb-0 inv-table">
-                <caption class="visually-hidden">แยกตามประเภทการรับ ปีงบ @r.FiscalYear</caption>
-                <thead class="table-light"><tr>
-                    <th scope="col">ประเภท</th><th scope="col">ชื่อประเภท</th>
-                    <th scope="col" class="text-end">ใบรับ</th><th scope="col" class="text-end">รายการ</th><th scope="col" class="text-end">มูลค่า (บาท)</th>
-                </tr></thead>
-                <tbody>
-                @foreach (var t in r.TypeBreakdown)
-                {
-                    <tr class="@(t.Code == Model.TypeCode ? "table-active" : null)">
-                        <td class="inv-code"><a asp-page="/Receipts/Index" asp-route-fy="@r.FiscalYear" asp-route-type="@t.Code" asp-route-q="@Model.Keyword">@t.Code</a></td>
-                        <td>@t.DisplayName</td>
-                        <td class="text-end">@t.HeaderCount.ToString("N0")</td>
-                        <td class="text-end">@t.LineCount.ToString("N0")</td>
-                        <td class="text-end">@t.TotalValue.ToString("N2")</td>
-                    </tr>
-                }
-                </tbody>
-            </table>
-        </div>
-    }
-
-    <p class="mb-2" aria-live="polite">
-        ปีงบ <strong>@r.FiscalYear</strong>
-        @if (Model.TypeCode is not null) { <text>· ประเภท <strong>@Model.TypeCode</strong></text> }
-        @if (Model.Keyword is not null) { <text>· ค้นหา “<strong>@Model.Keyword</strong>”</text> }
-        · แสดง <strong>@r.Rows.Count.ToString("N0")</strong> ใบ จาก @r.HeaderCount.ToString("N0") ใบในปีนี้
-    </p>
-
-    @if (r.Rows.Count == 0)
-    {
-        <div class="alert alert-secondary" role="status">
-            @if (r.HeaderCount == 0) { <text>ไม่มีรายการรับเข้าในปีงบประมาณ @r.FiscalYear@(Model.Keyword is null ? "" : $" ที่ตรงกับ “{Model.Keyword}”")</text> }
-            else { <text>ไม่มีใบรับเข้าประเภท “@Model.TypeCode” ในเงื่อนไขที่เลือก</text> }
-        </div>
-    }
-    else
-    {
-        <div class="table-responsive inv-table-wrap">
-            <table class="table table-sm table-striped table-hover align-middle inv-table rc-table">
-                <caption class="visually-hidden">ใบรับเข้าอื่น ปีงบ @r.FiscalYear</caption>
-                <thead class="table-light">
-                    <tr>
-                        <th scope="col" class="text-end inv-col-no">#</th>
-                        <th scope="col">เลขที่ใบรับ</th>
-                        <th scope="col">วันที่รับ</th>
-                        <th scope="col">ประเภท</th>
-                        <th scope="col">แหล่งที่มา</th>
-                        <th scope="col">เลขที่เอกสาร</th>
-                        <th scope="col" class="text-end">รายการ</th>
-                        <th scope="col" class="text-end">จำนวน (หน่วยจ่าย)</th>
-                        <th scope="col" class="text-end">มูลค่า (บาท)</th>
-                    </tr>
-                </thead>
-                <tbody>
-                @{ var n = 0; }
-                @foreach (var h in r.Rows)
-                {
-                    n++;
-                    <tr>
-                        <td class="text-end text-muted">@n</td>
-                        <td class="inv-code"><a asp-page="/Receipts/Detail" asp-route-receiveNo="@h.ReceiveNo">@h.ReceiveNo</a></td>
-                        <td>@(h.DateReceive?.ToString("d MMM yyyy"))</td>
-                        <td><span class="badge text-bg-light border inv-code">@h.TypeCode</span> @h.TypeDisplayName</td>
-                        <td class="rc-source">@h.SourceDisplayName @(h.SourceName is not null ? $"({h.SourceCode})" : "")</td>
-                        <td>@h.InvoiceNo</td>
-                        <td class="text-end">@h.LineCount.ToString("N0")</td>
-                        <td class="text-end">@h.LineQtySum.ToString("N0")</td>
-                        <td class="text-end">@(h.TotalValue?.ToString("N2"))</td>
-                    </tr>
-                }
-                </tbody>
-            </table>
-        </div>
-    }
-
-    <details class="mt-2 text-muted small">
-        <summary>ที่มาของข้อมูล</summary>
-        <ul class="mb-0 mt-2">
-            <li>หัวใบรับ = OTH_IVO (คีย์ RECEIVE_NO), รายการ = OTH_IVOC (RECEIVE_NO เดียวกัน), ประเภท = RCV_TYPE</li>
-            <li>ปีงบประมาณอ่านจากวันที่รับ (DATE_RECEIVE): 1 ต.ค. – 30 ก.ย.</li>
-            <li>มูลค่า = TOTAL_VALUE ของหัวใบรับ (= Σ UNIT_VALUE × จำนวน ÷ ขนาดบรรจุ ของรายการ) — ประเภทที่ไม่มีมูลค่าบันทึกเป็น 0</li>
-        </ul>
-    </details>
-}

@@ -1,102 +1,139 @@
+@using Invc.Core.Inventory
 @using Invc.Core.Receipts
 @model NonPoReceiptDetail
+@*
+    Screen body of a non-PO receipt (Detail page). Print uses _ReceiptPrintBody.
+    Summary band → ข้อมูลใบรับ (kv grid) → lines on ds-table (name/code · qty · pack · price · value · lot/expiry/location grouped).
+    All OTH_IVO / OTH_IVOC values of the previous layout are still rendered; ReceiptRules.Packs / LineValue / reconciliation unchanged.
+*@
 @{
-    var print = ViewData["Print"] is true;
     var h = Model.Header;
     var rec = Model.Reconciliation;
+    var today = DateTime.Today;
     string D(DateTime? d) => d?.ToString("d MMM yyyy") ?? "–";
 }
 
-<div class="row g-2 mb-3 inv-cards">
-    <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body py-2">
-        <div class="text-muted small">ประเภทการรับ</div>
-        <div class="fs-5 fw-semibold"><span class="inv-code">@h.TypeCode</span> @h.TypeDisplayName</div>
-    </div></div></div>
-    <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body py-2">
-        <div class="text-muted small">วันที่รับ</div>
-        <div class="fs-5 fw-semibold">@D(h.DateReceive)</div>
-        <div class="small text-muted">ปีงบ @(h.FiscalYear?.ToString() ?? "–")</div>
-    </div></div></div>
-    <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body py-2">
-        <div class="text-muted small">รายการ / จำนวน</div>
-        <div class="fs-5 fw-semibold">@Model.Lines.Count.ToString("N0") รายการ · @Model.Lines.Sum(l => l.QtyOrder ?? 0m).ToString("N0") หน่วย</div>
-    </div></div></div>
-    <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body py-2">
-        <div class="text-muted small">มูลค่า (บาท)</div>
-        <div class="fs-5 fw-semibold">@(h.TotalValue?.ToString("N2") ?? "–")</div>
-    </div></div></div>
-</div>
-
-<dl class="row mb-3 inv-dl">
-    <dt class="col-5 col-sm-3 col-lg-2">เลขที่ใบรับ</dt><dd class="col-7 col-sm-9 col-lg-4 inv-code">@h.ReceiveNo</dd>
-    <dt class="col-5 col-sm-3 col-lg-2">แหล่งที่มา</dt><dd class="col-7 col-sm-9 col-lg-4">@h.SourceDisplayName <span class="text-muted">(@h.SourceCode)</span></dd>
-    <dt class="col-5 col-sm-3 col-lg-2">เลขที่เอกสารอ้างอิง</dt><dd class="col-7 col-sm-9 col-lg-4">@(h.InvoiceNo ?? "–")</dd>
-    <dt class="col-5 col-sm-3 col-lg-2">วันที่เอกสาร</dt><dd class="col-7 col-sm-9 col-lg-4">@D(h.InvoiceDate)</dd>
-    <dt class="col-5 col-sm-3 col-lg-2">หมายเหตุ</dt><dd class="col-7 col-sm-9 col-lg-4">@(string.IsNullOrWhiteSpace(h.Note) ? "–" : h.Note)</dd>
-</dl>
-
-<h2 class="h5 d-flex flex-wrap align-items-center gap-2">
-    รายการที่รับ
-    <span class="badge text-bg-light border">@Model.Lines.Count รายการ</span>
-    @if (Model.Lines.Count > 0)
-    {
-        if (rec.IsConsistent) { <span class="badge text-bg-success">ยอดรายการตรงกับหัวใบรับ</span> }
-        else { <span class="badge text-bg-warning text-dark">ยอดรายการไม่ตรงกับหัวใบรับ</span> }
-    }
-</h2>
-@if (Model.Lines.Count == 0)
-{
-    <div class="alert alert-secondary" role="status">ไม่พบรายการของใบรับนี้ (OTH_IVOC)</div>
-}
-else
-{
-    <div class="@(print ? "" : "table-responsive")">
-        <table class="table table-sm align-middle inv-table rc-lines @(print ? "table-bordered" : "table-striped")">
-            <thead class="table-light"><tr>
-                <th scope="col" class="text-end inv-col-no">#</th>
-                <th scope="col">รหัส</th>
-                <th scope="col">รายการ</th>
-                <th scope="col" class="text-end">จำนวน (หน่วยจ่าย)</th>
-                <th scope="col" class="text-end">ขนาดบรรจุ</th>
-                <th scope="col" class="text-end">แพ็ค</th>
-                <th scope="col" class="text-end">ราคา/แพ็ค</th>
-                <th scope="col" class="text-end">มูลค่า</th>
-                <th scope="col">เลขที่ผลิต</th>
-                <th scope="col">วันหมดอายุ</th>
-                <th scope="col">ที่เก็บ</th>
-            </tr></thead>
-            <tbody>
-            @{ var n = 0; }
-            @foreach (var l in Model.Lines)
-            {
-                n++;
-                var expired = l.ExpiredDate is { } d && d.Date < DateTime.Today;
-                <tr class="@(expired ? "table-danger" : null)">
-                    <td class="text-end text-muted">@n</td>
-                    <td class="inv-code">
-                        @if (print || l.DrugName is null) { @l.WorkingCode } else { <a asp-page="/Inventory/Detail" asp-route-workingCode="@l.WorkingCode">@l.WorkingCode</a> }
-                    </td>
-                    <td>@l.DisplayName</td>
-                    <td class="text-end">@(l.QtyOrder?.ToString("N0"))</td>
-                    <td class="text-end">@(l.PackRatio?.ToString("N0"))</td>
-                    <td class="text-end">@(l.Packs?.ToString("N2") ?? "–")</td>
-                    <td class="text-end">@(l.UnitValue?.ToString("N2"))</td>
-                    <td class="text-end">@(l.LineValue?.ToString("N2") ?? "–")</td>
-                    <td>@l.LotNo</td>
-                    <td>@D(l.ExpiredDate)</td>
-                    <td>@l.Location</td>
-                </tr>
-            }
-            </tbody>
-            <tfoot class="table-light fw-semibold">
-                <tr><td colspan="7" class="text-end">รวมรายการ</td><td class="text-end">@rec.LineValueSum.ToString("N2")</td><td colspan="3"></td></tr>
-                <tr><td colspan="7" class="text-end">หัวใบรับ (TOTAL_VALUE / TOTAL_ITEM)</td><td class="text-end">@(rec.HeaderValue?.ToString("N2") ?? "–")</td><td colspan="3">@(rec.HeaderItemCount?.ToString("N0") ?? "–") รายการ</td></tr>
-                @if (!rec.IsConsistent)
-                {
-                    <tr class="table-warning"><td colspan="7" class="text-end">ผลต่าง</td><td class="text-end">@rec.ValueDelta.ToString("N2")</td><td colspan="3">@(rec.ItemCountMatches ? "" : $"จำนวนรายการ {rec.HeaderItemCount} ≠ {rec.LineCount}")</td></tr>
-                }
-            </tfoot>
-        </table>
+<section class="ds-detail-summary receipt-summary" aria-label="สรุปใบรับ">
+    <div class="ds-kpi">
+        <span class="ds-kpi-label">ประเภทการรับ</span>
+        <span class="ds-kpi-value receipt-kpi-type"><span class="receipt-type-code">@h.TypeCode</span> @h.TypeDisplayName</span>
     </div>
-    <p class="text-muted small">แถวสีแดง = ล็อตที่หมดอายุแล้ว (เทียบกับวันนี้) · มูลค่า = ราคา/แพ็ค × จำนวน ÷ ขนาดบรรจุ</p>
-}
+    <div class="ds-kpi">
+        <span class="ds-kpi-label">รายการ</span>
+        <span class="ds-kpi-value">@Model.Lines.Count.ToString("N0")</span>
+    </div>
+    <div class="ds-kpi">
+        <span class="ds-kpi-label">จำนวน (หน่วยจ่าย)</span>
+        <span class="ds-kpi-value">@Model.Lines.Sum(l => l.QtyOrder ?? 0m).ToString("N0")</span>
+    </div>
+    <div class="ds-kpi">
+        <span class="ds-kpi-label">มูลค่า (บาท)</span>
+        <span class="ds-kpi-value">@(h.TotalValue?.ToString("N2") ?? "–")</span>
+    </div>
+</section>
+
+<section class="ds-detail-section receipt-info" aria-labelledby="rc-info-h">
+    <h2 id="rc-info-h" class="ds-section-title">ข้อมูลใบรับ</h2>
+    <dl class="ds-kv-grid receipt-kv">
+        <dt>เลขที่ใบรับ</dt><dd class="ds-code">@h.ReceiveNo</dd>
+        <dt>ประเภทการรับ</dt><dd>@h.TypeDisplayName <span class="receipt-muted">(@h.TypeCode)</span></dd>
+        <dt>แหล่งที่มา</dt><dd>@h.SourceDisplayName</dd>
+        <dt>รหัสแหล่ง</dt><dd class="ds-code">@(h.SourceCode ?? "–")</dd>
+        <dt>เลขเอกสาร</dt><dd>@(string.IsNullOrWhiteSpace(h.InvoiceNo) ? "–" : h.InvoiceNo)</dd>
+        <dt>วันที่เอกสาร</dt><dd>@D(h.InvoiceDate)</dd>
+        <dt>วันที่รับ</dt><dd>@D(h.DateReceive) <span class="receipt-muted">ปีงบ @(h.FiscalYear?.ToString() ?? "–")</span></dd>
+        <dt>หมายเหตุ</dt><dd>@(string.IsNullOrWhiteSpace(h.Note) ? "–" : h.Note)</dd>
+    </dl>
+</section>
+
+<section class="ds-detail-section receipt-lines-section" aria-labelledby="rc-lines-h">
+    <h2 id="rc-lines-h" class="ds-section-title">
+        รายการที่รับ <span class="ds-section-count">@Model.Lines.Count รายการ</span>
+        @if (Model.Lines.Count > 0)
+        {
+            if (rec.IsConsistent)
+            {
+                <span class="status-chip status-chip-success receipt-recon">ยอดตรงกัน</span>
+            }
+            else
+            {
+                <span class="status-chip status-chip-warning receipt-recon">ยอดไม่ตรงกัน · ผลต่าง @rec.ValueDelta.ToString("N2") บาท@(rec.ItemCountMatches ? "" : $" · รายการ {rec.HeaderItemCount?.ToString("N0") ?? "–"} ≠ {rec.LineCount}")</span>
+            }
+        }
+    </h2>
+    @if (Model.Lines.Count == 0)
+    {
+        <div class="ds-empty" role="status">ไม่พบรายการของใบรับนี้ (OTH_IVOC)</div>
+    }
+    else
+    {
+        <div class="ds-list receipt-lines-list">
+            <table class="ds-table receipt-lines">
+                <caption class="visually-hidden">รายการของใบรับ @h.ReceiveNo</caption>
+                <thead><tr>
+                    <th scope="col" class="ds-col-no">#</th>
+                    <th scope="col">รายการยา</th>
+                    <th scope="col" class="ds-col-num">จำนวน</th>
+                    <th scope="col" class="ds-col-num receipt-col-pack">บรรจุ / แพ็ค</th>
+                    <th scope="col" class="ds-col-num ds-col-secondary">ราคา/แพ็ค</th>
+                    <th scope="col" class="ds-col-num">มูลค่า</th>
+                    <th scope="col" class="receipt-col-lot ds-col-secondary">ล็อต / หมดอายุ / ที่เก็บ</th>
+                </tr></thead>
+                <tbody>
+                @{ var n = 0; }
+                @foreach (var l in Model.Lines)
+                {
+                    n++;
+                    var expired = l.ExpiredDate is { } d && d.Date < today;
+                    <tr class="ds-row receipt-line @(expired ? "is-expired" : "")">
+                        <td class="ds-col-no">@n</td>
+                        <td class="ds-item-main">
+                            @if (l.DrugName is null)
+                            {
+                                <span class="ds-item-name">@l.DisplayName</span>
+                            }
+                            else
+                            {
+                                <a class="ds-item-name" asp-page="/Inventory/Detail" asp-route-workingCode="@l.WorkingCode">@l.DisplayName</a>
+                            }
+                            <div class="ds-item-meta">
+                                <span class="ds-code">@l.WorkingCode</span>
+                                @if (expired) { <span class="dot"></span><span class="status-chip status-chip-danger receipt-expired">หมดอายุ</span> }
+                            </div>
+                            <div class="ds-item-meta receipt-lot-meta receipt-lot-meta--mobile">
+                                <span>Lot @(string.IsNullOrWhiteSpace(l.LotNo) ? "–" : l.LotNo)</span>
+                                <span class="dot"></span><span>หมดอายุ @D(l.ExpiredDate)</span>
+                                @if (!string.IsNullOrWhiteSpace(l.Location)) { <span class="dot"></span><span>@l.Location</span> }
+                                @if (l.UnitValue is { } uv) { <span class="dot"></span><span>ราคา/แพ็ค @uv.ToString("N2")</span> }
+                            </div>
+                        </td>
+                        <td class="ds-col-num ds-number receipt-line-qty">@(l.QtyOrder?.ToString("N0") ?? "–")</td>
+                        <td class="ds-col-num ds-number receipt-col-pack">
+                            <span class="receipt-pack-ratio">@(l.PackRatio?.ToString("N0") ?? "–")</span>
+                            <span class="receipt-pack-count">@(l.Packs?.ToString("N2") ?? "–") แพ็ค</span>
+                        </td>
+                        <td class="ds-col-num ds-number ds-col-secondary">@(l.UnitValue?.ToString("N2") ?? "–")</td>
+                        <td class="ds-col-num ds-number receipt-line-value">@(l.LineValue?.ToString("N2") ?? "–")</td>
+                        <td class="receipt-col-lot ds-col-secondary">
+                            <div class="receipt-lot-meta">
+                                <span class="receipt-lot-no">Lot @(string.IsNullOrWhiteSpace(l.LotNo) ? "–" : l.LotNo)</span>
+                                <span class="receipt-lot-exp @(expired ? "is-expired" : "")">หมดอายุ @D(l.ExpiredDate)</span>
+                                <span class="receipt-lot-loc">@(string.IsNullOrWhiteSpace(l.Location) ? "ที่เก็บ –" : l.Location)</span>
+                            </div>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+                <tfoot>
+                    <tr><td colspan="5" class="ds-col-num">รวมรายการ</td><td class="ds-col-num ds-number">@rec.LineValueSum.ToString("N2")</td><td class="ds-col-secondary"></td></tr>
+                    <tr><td colspan="5" class="ds-col-num">หัวใบรับ (TOTAL_VALUE / TOTAL_ITEM)</td><td class="ds-col-num ds-number">@(rec.HeaderValue?.ToString("N2") ?? "–")</td><td class="ds-col-secondary">@(rec.HeaderItemCount?.ToString("N0") ?? "–") รายการ</td></tr>
+                    @if (!rec.IsConsistent)
+                    {
+                        <tr class="receipt-recon-row"><td colspan="5" class="ds-col-num">ผลต่าง</td><td class="ds-col-num ds-number">@rec.ValueDelta.ToString("N2")</td><td class="ds-col-secondary">@(rec.ItemCountMatches ? "" : $"จำนวนรายการ {rec.HeaderItemCount} ≠ {rec.LineCount}")</td></tr>
+                    }
+                </tfoot>
+            </table>
+        </div>
+        <p class="ds-note receipt-note">มูลค่า = ราคา/แพ็ค × จำนวน ÷ ขนาดบรรจุ · “หมดอายุ” = ล็อตที่หมดอายุแล้วเทียบกับวันนี้</p>
+    }
+</section>

@@ -119,6 +119,9 @@ a:focus-visible, button:focus-visible, .btn:focus-visible, .form-control:focus-v
 .status-chip-danger { background: var(--danger-soft); color: var(--danger); border-color: #f0c9c9; }
 .status-chip-neutral { background: var(--surface-soft); color: var(--text-secondary); border-color: var(--border-strong); }
 .ds-note { font-size: .82rem; color: var(--text-tertiary); margin: var(--sp-2) 0 0; }
+.ds-warning { margin: 0 0 var(--sp-3); padding: var(--sp-2) var(--sp-3); font-size: .86rem; color: var(--warning); background: var(--warning-soft); border: 1px solid #f1dfb8; border-radius: var(--radius); }
+.ds-error { margin: 0 0 var(--sp-3); padding: var(--sp-3) var(--sp-4); font-size: .92rem; color: var(--danger); background: var(--danger-soft); border: 1px solid #f0c9c9; border-radius: var(--radius); }
+.ds-error a { color: var(--danger); font-weight: 600; }
 
 /* ---- Page & section headers ---- */
 .page-header { margin-bottom: 1rem; }
@@ -203,7 +206,7 @@ a.metric-card:hover { border-color: var(--app-primary); box-shadow: 0 2px 8px rg
 /* phones: legacy dense tables (Dashboard, PO, Receipts) compact and wrap every cell so the page itself never scrolls sideways
    (these modules get their own responsive layout when they are migrated; until then no inner scroller is allowed). */
 @media (max-width: 767.98px) {
-  .inv-table, .rc-table, .rc-lines { font-size: .74rem; table-layout: fixed; width: 100%; }
+  .inv-table { font-size: .74rem; table-layout: fixed; width: 100%; }
   .inv-table td, .inv-table th { padding: .3rem .2rem; overflow-wrap: anywhere; }
   .inv-table td, .inv-table th, .inv-table td *, .inv-table th * { white-space: normal !important; min-width: 0 !important; }
 }
@@ -215,10 +218,6 @@ a.metric-card:hover { border-color: var(--app-primary); box-shadow: 0 2px 8px rg
 }
 
 /* ---- Module-specific column widths ---- */
-.rc-table td.rc-source { white-space: normal; min-width: 10rem; }
-.rc-table td:nth-child(2) { white-space: nowrap; min-width: 0; }
-.rc-lines td:nth-child(3) { white-space: normal; min-width: 10rem; }
-.rc-lines td:nth-child(2) { white-space: nowrap; min-width: 0; }
 
 /* ==========================================================================
    Reorder (คำแนะนำการสั่งซื้อ) — operational work page on the shared design system.
@@ -407,6 +406,72 @@ a.metric-card:hover { border-color: var(--app-primary); box-shadow: 0 2px 8px rg
   .po-receipt-header { padding: var(--sp-3) var(--sp-4) var(--sp-3) calc(var(--sp-4) - 3px); }
   .po-receipt-item { padding: var(--sp-3) var(--sp-4); column-gap: var(--sp-3); }
   .po-detail-date { display: block; margin-left: 0; }
+}
+
+/* ==========================================================================
+   Receipts (รับเข้าอื่น / รับจาก CUP) — non-PO receipt list + document detail on the shared design system.
+   Primary controls = year + type selects (one toolbar); list = shared .ds-table; detail = ds-detail primitives.
+   ========================================================================== */
+.receipts-toolbar .ds-select { flex: 0 0 auto; max-width: 100%; }
+.receipts-context { margin: 0 0 var(--sp-3); font-size: .95rem; color: var(--text-secondary); }
+.receipts-context strong { color: var(--text-primary); font-weight: 650; }
+.receipts-context-sub { display: block; font-size: .82rem; color: var(--text-tertiary); margin-top: 2px; }
+
+/* list */
+.receipt-table .ds-item-main { min-width: 10rem; }
+.receipt-number { font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+.receipt-col-source { min-width: 14rem; }
+.receipt-type { font-size: .84rem; color: var(--text-secondary); }
+.receipt-type-code { display: inline-block; min-width: 1.6em; padding: 0 5px; border-radius: 4px; background: var(--surface-soft); border: 1px solid var(--border); color: var(--text-tertiary); font-size: .74rem; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: .04em; margin-right: 2px; }
+.receipt-source { font-weight: 500; color: var(--text-primary); line-height: 1.4; }
+.receipt-table .receipt-meta--mobile { display: none; }
+.receipt-col-qty { white-space: nowrap; }
+.receipt-qty { font-weight: 650; color: var(--text-primary); font-size: 1rem; }
+.receipt-qty small { font-size: .74rem; font-weight: 400; color: var(--text-tertiary); }
+.receipt-items { font-size: .8rem; color: var(--text-secondary); text-align: right; }
+.receipt-value { font-weight: 600; color: var(--text-primary); }
+.receipt-col-date { width: 7.5rem; white-space: nowrap; color: var(--text-secondary); font-size: .9rem; }
+.receipts-breakdown-table { max-width: 48rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+
+/* detail */
+.receipt-detail-type { margin: 2px 0 0; font-size: 1.02rem; font-weight: 500; color: var(--text-primary); }
+.receipt-detail-source { margin: 0; font-size: .95rem; color: var(--text-secondary); }
+.receipt-detail-date { margin-left: var(--sp-2); }
+.receipt-summary .receipt-kpi-type { font-size: 1.05rem; }
+.receipt-muted { color: var(--text-tertiary); font-size: .85em; }
+.receipt-info { margin-bottom: var(--sp-4); }
+.receipt-lines-section .ds-list { margin-top: var(--sp-2); }
+.receipt-recon { margin-left: var(--sp-2); font-weight: 600; }
+.receipt-line-qty { font-weight: 650; color: var(--text-primary); font-size: 1rem; }
+.receipt-col-pack { white-space: nowrap; }
+.receipt-pack-ratio { display: block; font-weight: 500; }
+.receipt-pack-count { display: block; font-size: .78rem; color: var(--text-secondary); }
+.receipt-line-value { font-weight: 600; color: var(--text-primary); }
+.receipt-col-lot { min-width: 11rem; }
+.receipt-lot-meta { display: flex; flex-direction: column; gap: 1px; font-size: .82rem; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.receipt-lot-no { color: var(--text-primary); }
+.receipt-lot-exp.is-expired { color: var(--danger); font-weight: 600; }
+.receipt-table .receipt-lot-meta--mobile, .receipt-lines .receipt-lot-meta--mobile { display: none; }
+/* expired lot = text chip + thin accent only; rows stay neutral */
+.receipt-line.is-expired > td:first-child { box-shadow: inset 3px 0 0 var(--danger); }
+.receipt-expired { padding: 0 7px; font-size: .72rem; line-height: 1.4; }
+.receipt-recon-row td { color: var(--warning); }
+.receipt-note { margin-top: var(--sp-2); }
+
+@media (max-width: 1199.98px) {
+  .receipt-col-source { min-width: 10rem; }
+  .receipt-col-lot { min-width: 9rem; }
+}
+@media (max-width: 767.98px) {
+  .receipt-table, .receipt-lines { table-layout: fixed; }
+  .receipt-col-source, .receipt-col-date, .receipt-col-lot, .receipt-table .ds-col-no, .receipt-lines .ds-col-no, .receipt-lines .receipt-col-pack, .receipt-lines .ds-col-secondary { display: none; }
+  .receipt-table .receipt-meta--mobile { display: flex; }
+  .receipt-lines .receipt-lot-meta--mobile { display: flex; flex-direction: row; }
+  .receipt-table .ds-item-main, .receipt-lines .ds-item-main { min-width: 0; }
+  .receipt-table .ds-col-num { width: 5.4rem; }
+  .receipt-lines .ds-col-num { width: 4.6rem; }
+  .receipt-col-qty, .receipt-col-pack { white-space: normal; }
+  .receipt-detail-date { display: block; margin-left: 0; }
 }
 
 /* ==========================================================================

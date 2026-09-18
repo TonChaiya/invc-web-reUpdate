@@ -16,13 +16,23 @@
     <link rel="stylesheet" href="~/css/print.css" asp-append-version="true" />
 </head>
 <body class="print-body">
-    <div class="no-print d-flex gap-2 align-items-center mb-3">
-        <button type="button" class="btn btn-primary" onclick="window.print()">พิมพ์ / บันทึกเป็น PDF</button>
-        <a class="btn btn-outline-secondary" asp-page="/Receipts/Detail" asp-route-receiveNo="@number">กลับหน้าใบรับเข้า</a>
+    <div class="no-print print-actions">
+        <button type="button" class="ds-btn ds-btn-primary" onclick="window.print()">พิมพ์ / บันทึกเป็น PDF</button>
+        <a class="ds-btn ds-btn-secondary" asp-page="/Receipts/Detail" asp-route-receiveNo="@number">กลับหน้าใบรับเข้า</a>
+        <span class="print-hint">ใช้คำสั่งพิมพ์ของเบราว์เซอร์ (Ctrl+P) เพื่อบันทึกเป็น PDF · กระดาษ A4</span>
     </div>
     <header class="print-header">
-        <h1 class="h4 mb-1">ใบรับเข้าอื่น (ไม่อ้างอิงใบสั่งซื้อ) @number</h1>
-        <div class="print-meta">คลังเวชภัณฑ์หลัก · พิมพ์เมื่อ @DateTime.Now.ToString("d MMMM yyyy HH:mm")</div>
+        <div class="print-org">INVC · คลังเวชภัณฑ์หลัก</div>
+        <h1 class="print-title">ใบรับเข้าอื่น (ไม่อ้างอิงใบสั่งซื้อ) @number</h1>
+        <dl class="print-meta">
+            @if (Model.Receipt is { } rc)
+            {
+                <div><dt>ประเภท</dt><dd><strong>@rc.Header.TypeDisplayName</strong></dd></div>
+                <div><dt>แหล่งที่มา</dt><dd>@rc.Header.SourceDisplayName (@(rc.Header.SourceCode ?? "–"))</dd></div>
+                <div><dt>วันที่รับ</dt><dd>@(rc.Header.DateReceive?.ToString("d MMMM yyyy") ?? "–")</dd></div>
+            }
+            <div><dt>พิมพ์เมื่อ</dt><dd>@DateTime.Now.ToString("d MMMM yyyy HH:mm")</dd></div>
+        </dl>
     </header>
     @if (Model.HasError)
     {
@@ -30,7 +40,7 @@
     }
     else if (Model.Receipt is { } receipt)
     {
-        <partial name="_ReceiptBody" model="receipt" />
+        <partial name="_ReceiptPrintBody" model="receipt" />
     }
 </body>
 </html>

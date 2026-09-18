@@ -1,0 +1,76 @@
+@using Invc.Core.Receipts
+@model NonPoReceiptDetail
+@* Formal A4 document body for /Receipts/Print: black/grey, compact, no interactive UI. Same data as the screen body. *@
+@{
+    var h = Model.Header;
+    var rec = Model.Reconciliation;
+    var today = DateTime.Today;
+    string D(DateTime? d) => d?.ToString("d MMM yyyy") ?? "–";
+}
+
+<dl class="print-totals">
+    <div><dt>ประเภทการรับ</dt><dd><strong>@h.TypeCode @h.TypeDisplayName</strong></dd></div>
+    <div><dt>รายการ</dt><dd>@Model.Lines.Count.ToString("N0")</dd></div>
+    <div><dt>จำนวน</dt><dd>@Model.Lines.Sum(l => l.QtyOrder ?? 0m).ToString("N0") หน่วย</dd></div>
+    <div><dt>มูลค่า</dt><dd><strong>@(h.TotalValue?.ToString("N2") ?? "–")</strong> บาท</dd></div>
+</dl>
+
+<section class="print-section">
+    <h2 class="print-section-title">ข้อมูลใบรับ</h2>
+    <dl class="print-kv print-kv--two">
+        <div><dt>เลขที่ใบรับ</dt><dd>@h.ReceiveNo</dd></div>
+        <div><dt>ประเภทการรับ</dt><dd>@h.TypeDisplayName (@h.TypeCode)</dd></div>
+        <div><dt>แหล่งที่มา</dt><dd>@h.SourceDisplayName (@(h.SourceCode ?? "–"))</dd></div>
+        <div><dt>เลขเอกสาร</dt><dd>@(string.IsNullOrWhiteSpace(h.InvoiceNo) ? "–" : h.InvoiceNo)</dd></div>
+        <div><dt>วันที่เอกสาร</dt><dd>@D(h.InvoiceDate)</dd></div>
+        <div><dt>วันที่รับ</dt><dd>@D(h.DateReceive) (ปีงบ @(h.FiscalYear?.ToString() ?? "–"))</dd></div>
+        <div><dt>หมายเหตุ</dt><dd>@(string.IsNullOrWhiteSpace(h.Note) ? "–" : h.Note)</dd></div>
+    </dl>
+</section>
+
+<h2 class="print-section-title">รายการที่รับ (@Model.Lines.Count รายการ) — @(Model.Lines.Count == 0 ? "" : rec.IsConsistent ? "ยอดตรงกับหัวใบรับ" : $"ยอดไม่ตรงกับหัวใบรับ · ผลต่าง {rec.ValueDelta:N2} บาท")</h2>
+@if (Model.Lines.Count == 0)
+{
+    <p class="print-empty">ไม่พบรายการของใบรับนี้ (OTH_IVOC)</p>
+}
+else
+{
+    <table class="print-table receipt-print-lines">
+        <thead><tr>
+            <th class="num">#</th><th>รหัส</th><th>รายการ</th>
+            <th class="num">จำนวน</th><th class="num">บรรจุ</th><th class="num">แพ็ค</th>
+            <th class="num">ราคา/แพ็ค</th><th class="num">มูลค่า</th>
+            <th>เลขที่ผลิต</th><th>วันหมดอายุ</th><th>ที่เก็บ</th>
+        </tr></thead>
+        <tbody>
+        @{ var n = 0; }
+        @foreach (var l in Model.Lines)
+        {
+            n++;
+            var expired = l.ExpiredDate is { } d && d.Date < today;
+            <tr>
+                <td class="num muted">@n</td>
+                <td class="code">@l.WorkingCode</td>
+                <td>@l.DisplayName</td>
+                <td class="num">@(l.QtyOrder?.ToString("N0"))</td>
+                <td class="num">@(l.PackRatio?.ToString("N0"))</td>
+                <td class="num">@(l.Packs?.ToString("N2") ?? "–")</td>
+                <td class="num">@(l.UnitValue?.ToString("N2"))</td>
+                <td class="num">@(l.LineValue?.ToString("N2") ?? "–")</td>
+                <td>@l.LotNo</td>
+                <td class="@(expired ? "strong" : "")">@D(l.ExpiredDate)@(expired ? " (หมดอายุ)" : "")</td>
+                <td>@l.Location</td>
+            </tr>
+        }
+        </tbody>
+        <tfoot>
+            <tr><td colspan="7" class="num strong">รวมรายการ</td><td class="num strong">@rec.LineValueSum.ToString("N2")</td><td colspan="3"></td></tr>
+            <tr><td colspan="7" class="num">หัวใบรับ (TOTAL_VALUE / TOTAL_ITEM)</td><td class="num">@(rec.HeaderValue?.ToString("N2") ?? "–")</td><td colspan="3">@(rec.HeaderItemCount?.ToString("N0") ?? "–") รายการ</td></tr>
+            @if (!rec.IsConsistent)
+            {
+                <tr><td colspan="7" class="num strong">ผลต่าง</td><td class="num strong">@rec.ValueDelta.ToString("N2")</td><td colspan="3">@(rec.ItemCountMatches ? "" : $"จำนวนรายการ {rec.HeaderItemCount} ≠ {rec.LineCount}")</td></tr>
+            }
+        </tfoot>
+    </table>
+    <p class="print-footer">มูลค่า = ราคา/แพ็ค × จำนวน ÷ ขนาดบรรจุ · “(หมดอายุ)” = ล็อตที่หมดอายุแล้วเทียบกับวันที่พิมพ์</p>
+}
