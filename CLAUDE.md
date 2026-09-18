@@ -51,6 +51,17 @@ legacy *.asp, Connections/, css/, js/…   legacy Classic ASP (Windows-874 encod
 - Deployment rules (owner-approved, Phase 8): access control = **IIS Windows Authentication, no application login page, no ASP.NET Core Identity/cookie auth, no user/role tables** — never add `AddAuthentication`/login pages; the app uses one read-only app-pool identity to SQL (never impersonates users, never `sa`). Production web root is a versioned folder (`D:/Apps/InvcWeb/releases/<id>`), **never `C:/INVC/Web`** — IIS currently serves the working copy at `/invc` (legacy), which is an owner-decided infrastructure issue, not something scripts may change. Design: `docs/superpowers/specs/2026-09-16-iis-deployment-design.md`; facts: `docs/phase8-environment-discovery.md`.
 - DB compatibility level is 100: no `TRY_CAST`, `STRING_AGG`, `OPENJSON`, `FORMAT`.
 
+## UX / information-architecture rules (owner-mandated, 2026-09-18)
+- **ONE CONCEPT = ONE PRIMARY CONTROL.** If a page has a dropdown/select/filter for a category, status or type, never repeat the same choices underneath as a card row, a table of every category, a chip group or a full breakdown unless that second view serves a clearly different operational purpose. After a selection show only: selected context, result count, one useful aggregate, the actual result list. A still-useful complete breakdown goes behind a collapsed secondary disclosure ("ดูสรุปทุกประเภท" / "ดูสรุปทุกหมวด") that never competes with the work area.
+- Every page: the primary job the user came for owns the main visual area; supporting statistics and technical explanations go below or behind disclosure. Simplify presentation first — never drop business logic or queries for appearance.
+- Dashboard priority: (1) needs attention/action now, (2) essential KPIs, (3) workflow state, (4) analytical/supporting; the same measure must not appear twice at equal visual priority.
+- Inventory: search/filter → stock rows → drug detail; category/account dropdown must not be duplicated by permanent per-category cards/tables (compact summary of the selected category only).
+- Reorder: the status filter strip is the single selector (no duplicate dropdown); priority ต้องสั่งซื้อทันที → ใกล้ถึงจุดสั่งซื้อ → มีสำรอง.
+- Purchase Orders: bucket navigation stays the single selector (no status cards + selector for the same buckets); active/incomplete work before closed history.
+- Receipts (known redundancy): keep the "ประเภทการรับ" dropdown primary; result summary + receipt list below; the TypeBreakdown table moves behind collapsed "ดูสรุปทุกประเภท" or is omitted.
+- Borrow: primary = ค้างคืน / ต้องตรวจสอบ; คืนแล้ว / history is secondary and never equally prominent.
+- Migration cadence: ONE module per checkpoint (Borrow → Inventory Status+Detail → Reorder → PO → Receipts → Dashboard → polish); owner reviews each before the next.
+
 ## Key docs
 `docs/data-source-map.md` (schema + evidence), `docs/inventory-business-rules.md`, `docs/purchase-order-business-rules.md`,
 `docs/report-parity-matrix.md`, `docs/phase2-inventory-parity.md` (A1–A10), `docs/phase3-reorder-parity.md` (B1–B6), `docs/phase4-purchase-order-parity.md` (C1–C9), `docs/phase5-receipts-data-map.md` + `docs/phase5-receipts-parity.md` (C10a–C10j), `docs/phase6-dashboard-parity.md` (D1–D10, C11), `docs/phase7-release-readiness.md`, `docs/iis-deployment-runbook.md`,

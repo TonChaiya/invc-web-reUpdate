@@ -2,148 +2,166 @@
 @model Invc.Web.Pages.Inventory.DetailModel
 @{
     ViewData["Title"] = Model.Item is null ? "รายละเอียดรายการ" : $"{Model.Item.WorkingCode} {Model.Item.DrugName}";
+    ViewData["HideNavSearch"] = true;
 }
 
-<nav aria-label="breadcrumb">
-    <ol class="breadcrumb mb-2">
-        <li class="breadcrumb-item"><a asp-page="/Inventory/Status">สถานะคงคลัง</a></li>
-        <li class="breadcrumb-item active" aria-current="page">@Model.WorkingCode</li>
-    </ol>
-</nav>
+<div class="inventory-page inventory-detail ds-page">
+    <nav class="ds-breadcrumb" aria-label="breadcrumb">
+        <a asp-page="/Inventory/Status">สถานะคงคลัง</a> <span aria-hidden="true">/</span> <span>@Model.WorkingCode</span>
+    </nav>
 
-@if (Model.HasError)
-{
-    <div class="alert alert-danger" role="alert">
-        ไม่สามารถอ่านข้อมูลรายการจากฐานข้อมูล INV ได้ กรุณาตรวจสอบหน้า <a asp-page="/Health" class="alert-link">สถานะระบบ</a>
-    </div>
-}
-else if (Model.Item is { } item)
-{
-    var rec = item.Reconciliation;
-    <h1 class="h3 mb-0">@item.DrugName</h1>
-    <p class="text-muted mb-3">
-        รหัสยา <span class="inv-code">@item.WorkingCode</span>
-        @if (!string.IsNullOrEmpty(item.HospCode)) { <text>· รหัส รพ. @item.HospCode</text> }
-        @if (!string.IsNullOrEmpty(item.DosageForm)) { <text>· @item.DosageForm</text> }
-        @if (!string.IsNullOrEmpty(item.Composition)) { <text>· @item.Composition</text> }
-        @if (item.IsInactive) { <span class="badge text-bg-secondary ms-1">ยกเลิกใช้ (NOUSE)</span> }
-    </p>
+    @if (Model.HasError)
+    {
+        <div class="alert alert-danger" role="alert">
+            ไม่สามารถอ่านข้อมูลรายการจากฐานข้อมูล INV ได้ กรุณาตรวจสอบหน้า <a asp-page="/Health" class="alert-link">สถานะระบบ</a>
+        </div>
+    }
+    else if (Model.Item is { } item)
+    {
+        var rec = item.Reconciliation;
+        <div class="ds-page-header inventory-header">
+            <div>
+                <h1 class="ds-page-title">@item.DrugName</h1>
+                <p class="inventory-identity">
+                    <span class="inventory-code">@item.WorkingCode</span>
+                    @if (!string.IsNullOrEmpty(item.HospCode)) { <span class="dot"></span><span>รหัส รพ. @item.HospCode</span> }
+                    @if (!string.IsNullOrEmpty(item.Ven)) { <span class="dot"></span><span>VEN @item.Ven</span> }
+                    @if (!string.IsNullOrEmpty(item.SaleUnit)) { <span class="dot"></span><span>หน่วยจ่าย @item.SaleUnit</span> }
+                    @if (item.IsInactive) { <span class="status-chip status-chip-neutral">ยกเลิกใช้ (NOUSE)</span> }
+                </p>
+            </div>
+            <a class="ds-btn ds-btn-secondary" asp-page="/Inventory/Status">กลับสถานะคงคลัง</a>
+        </div>
 
-    <div class="row g-2 mb-3 inv-cards">
-        <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body py-2">
-            <div class="text-muted small">คงคลัง (@item.SaleUnit)</div>
-            <div class="fs-4 fw-semibold">@item.QtyOnHand.ToString("N0")</div>
-        </div></div></div>
-        <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body py-2">
-            <div class="text-muted small">มูลค่าคงคลัง (บาท)</div>
-            <div class="fs-4 fw-semibold">@item.TotalValue.ToString("N2")</div>
-        </div></div></div>
-        <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body py-2">
-            <div class="text-muted small">อัตราใช้/เดือน</div>
-            <div class="fs-4 fw-semibold">@(item.RatePerMonth?.ToString("N0") ?? "–")</div>
-        </div></div></div>
-        <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body py-2">
-            <div class="text-muted small">เหลือใช้ได้ (เดือน)</div>
-            <div class="fs-4 fw-semibold">@item.MonthsOfStockDisplay</div>
-        </div></div></div>
-    </div>
+        <section class="inventory-detail-summary" aria-label="สถานะคงคลังปัจจุบัน">
+            <div class="inventory-kpi">
+                <span class="inventory-kpi-label">คงคลัง (@item.SaleUnit)</span>
+                <span class="inventory-kpi-value inventory-number--strong">@item.QtyOnHand.ToString("N0")</span>
+            </div>
+            <div class="inventory-kpi">
+                <span class="inventory-kpi-label">เหลือใช้ได้ (เดือน)</span>
+                <span class="inventory-kpi-value @(item.RatePerMonth is null or 0m ? "inventory-number--na" : "")">@item.MonthsOfStockDisplay</span>
+            </div>
+            <div class="inventory-kpi">
+                <span class="inventory-kpi-label">อัตราใช้/เดือน</span>
+                <span class="inventory-kpi-value">@(item.RatePerMonth?.ToString("N0") ?? "–")</span>
+            </div>
+            <div class="inventory-kpi">
+                <span class="inventory-kpi-label">ยืมได้</span>
+                <span class="inventory-kpi-value">@item.BorrowableQty.ToString("N0")</span>
+            </div>
+            <div class="inventory-kpi">
+                <span class="inventory-kpi-label">มูลค่าคงคลัง (บาท)</span>
+                <span class="inventory-kpi-value">@item.TotalValue.ToString("N2")</span>
+            </div>
+        </section>
 
-    <dl class="row mb-3 inv-dl">
-        <dt class="col-sm-3 col-lg-2">ที่เก็บ</dt><dd class="col-sm-9 col-lg-4">@(item.Location ?? "–")</dd>
-        <dt class="col-sm-3 col-lg-2">บัญชียา</dt><dd class="col-sm-9 col-lg-4">@(item.EdNedName ?? "–")</dd>
-        <dt class="col-sm-3 col-lg-2">VEN / ABC</dt><dd class="col-sm-9 col-lg-4">@(item.Ven ?? "–") / @(item.Abc ?? "–")</dd>
-        <dt class="col-sm-3 col-lg-2">ยืมได้</dt><dd class="col-sm-9 col-lg-4">@item.BorrowableQty.ToString("N0")</dd>
-    </dl>
+        <div class="inventory-detail-grid">
+            <section class="inventory-detail-section" aria-labelledby="inv-info-h">
+                <h2 id="inv-info-h" class="inventory-section-title">ข้อมูลรายการ</h2>
+                <dl class="inventory-kv-grid">
+                    <dt>รหัสยา</dt><dd class="inventory-code">@item.WorkingCode</dd>
+                    <dt>รหัส รพ.</dt><dd>@(item.HospCode ?? "–")</dd>
+                    <dt>บัญชียา</dt><dd>@(item.EdNedName ?? "–")</dd>
+                    <dt>VEN / ABC</dt><dd>@(item.Ven ?? "–") / @(item.Abc ?? "–")</dd>
+                    <dt>หน่วยจ่าย</dt><dd>@(item.SaleUnit ?? "–")</dd>
+                    <dt>ที่เก็บ</dt><dd>@(item.Location ?? "–")</dd>
+                    <dt>รูปแบบ</dt><dd>@(item.DosageForm ?? "–")</dd>
+                    <dt>ส่วนประกอบ</dt><dd>@(item.Composition ?? "–")</dd>
+                </dl>
+            </section>
 
-    <h2 class="h5 d-flex flex-wrap align-items-center gap-2">
-        รายการล็อต
-        <span class="badge text-bg-light border">@rec.LotCount ล็อต</span>
-        @if (rec.LotCount > 0)
-        {
-            if (rec.IsConsistent)
+            <section class="inventory-detail-section" aria-labelledby="inv-rec-h">
+                <h2 id="inv-rec-h" class="inventory-section-title">ยอดคลังเทียบล็อต</h2>
+                <dl class="inventory-kv-grid">
+                    <dt>จำนวนล็อต</dt><dd>@rec.LotCount.ToString("N0")</dd>
+                    <dt>ยอดคลัง (INV_MD)</dt><dd class="inventory-tabular">@rec.HeaderQty.ToString("N0") @item.SaleUnit · @rec.HeaderValue.ToString("N2") บาท</dd>
+                    <dt>รวมล็อต (INV_MD_C)</dt><dd class="inventory-tabular">@rec.LotQtySum.ToString("N0") @item.SaleUnit · @rec.LotValueSum.ToString("N2") บาท</dd>
+                    <dt>สถานะ</dt>
+                    <dd>
+                        @if (rec.LotCount == 0)
+                        {
+                            <span class="status-chip status-chip-neutral">ไม่มีข้อมูลล็อต</span>
+                        }
+                        else if (rec.IsConsistent)
+                        {
+                            <span class="status-chip status-chip-success">ยอดล็อตตรงกับยอดคลัง</span>
+                        }
+                        else
+                        {
+                            <span class="status-chip status-chip-warning">ยอดล็อตไม่ตรงกับยอดคลัง</span>
+                            <span class="inventory-delta">ผลต่าง @rec.QtyDelta.ToString("N0") @item.SaleUnit · @rec.ValueDelta.ToString("N2") บาท</span>
+                        }
+                    </dd>
+                </dl>
+            </section>
+        </div>
+
+        <section class="inventory-detail-section inventory-lots" aria-labelledby="inv-lots-h">
+            <h2 id="inv-lots-h" class="inventory-section-title">รายการล็อต <span class="inventory-section-count">@rec.LotCount ล็อต</span></h2>
+            @if (rec.LotCount == 0)
             {
-                <span class="badge text-bg-success">ยอดล็อตตรงกับยอดคลัง</span>
+                <div class="ds-empty" role="status">ไม่มีข้อมูลล็อตสำหรับรายการนี้ (INV_MD_C)</div>
             }
             else
             {
-                <span class="badge text-bg-warning text-dark">ยอดล็อตไม่ตรงกับยอดคลัง</span>
+                <div class="inventory-list table-responsive">
+                    <table class="inventory-table inventory-table--compact">
+                        <caption class="visually-hidden">ล็อตของรายการ @item.WorkingCode</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col" class="inventory-col-no">#</th>
+                                <th scope="col">ชื่อการค้า / เลขที่ผลิต</th>
+                                <th scope="col">วันหมดอายุ</th>
+                                <th scope="col" class="inventory-col-num">คงเหลือ (@item.SaleUnit)</th>
+                                <th scope="col" class="inventory-col-num">แพ็ค</th>
+                                <th scope="col" class="inventory-col-num">ขนาดบรรจุ</th>
+                                <th scope="col" class="inventory-col-num">มูลค่า (บาท)</th>
+                                <th scope="col">ที่เก็บ</th>
+                                <th scope="col">ผู้จำหน่าย / ผู้ผลิต</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @{ var n = 0; }
+                        @foreach (var lot in item.Lots)
+                        {
+                            n++;
+                            var expired = lot.ExpiredDate is { } d && d.Date < DateTime.Today;
+                            <tr class="inventory-row @(expired ? "inventory-row--expired" : "")">
+                                <td class="inventory-col-no">@n</td>
+                                <td class="inventory-item-main">
+                                    <span class="inventory-lot-name">@(lot.TradeName ?? "–")</span>
+                                    <div class="inventory-item-meta"><span>Lot @(lot.LotNo ?? "–")</span></div>
+                                </td>
+                                <td class="inventory-nowrap">
+                                    @(lot.ExpiredDate?.ToString("d MMM yyyy") ?? "–")
+                                    @if (expired) { <span class="status-chip status-chip-danger">หมดอายุ</span> }
+                                </td>
+                                <td class="inventory-col-num inventory-number inventory-number--strong">@lot.QtyOnHand.ToString("N0")</td>
+                                <td class="inventory-col-num inventory-number">@(lot.Packs?.ToString("N2") ?? "–")</td>
+                                <td class="inventory-col-num inventory-number">@lot.PackRatio.ToString("N0")</td>
+                                <td class="inventory-col-num inventory-number">@(lot.LotValue?.ToString("N2") ?? "–")</td>
+                                <td>@(lot.Location ?? "–")</td>
+                                <td class="inventory-item-main">
+                                    <span>@(lot.VendorName ?? lot.VendorCode ?? "–")</span>
+                                    <div class="inventory-item-meta"><span>@(lot.ManufacName ?? lot.ManufacCode ?? "–")</span></div>
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="3" class="inventory-col-num">รวมล็อต</td>
+                                <td class="inventory-col-num inventory-number">@rec.LotQtySum.ToString("N0")</td>
+                                <td colspan="2"></td>
+                                <td class="inventory-col-num inventory-number">@rec.LotValueSum.ToString("N2")</td>
+                                <td colspan="2"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                <p class="ds-note">แถวที่มีป้าย “หมดอายุ” = ล็อตที่หมดอายุแล้ว (เทียบกับวันนี้)</p>
             }
-        }
-    </h2>
-
-    @if (rec.LotCount == 0)
-    {
-        <div class="alert alert-secondary" role="status">ไม่มีข้อมูลล็อตสำหรับรายการนี้ (INV_MD_C)</div>
+        </section>
     }
-    else
-    {
-        <div class="table-responsive inv-table-wrap">
-            <table class="table table-sm table-striped align-middle inv-table">
-                <caption class="visually-hidden">ล็อตของรายการ @item.WorkingCode</caption>
-                <thead class="table-light">
-                    <tr>
-                        <th scope="col" class="text-end inv-col-no">#</th>
-                        <th scope="col">ชื่อการค้า</th>
-                        <th scope="col" class="text-end">คงเหลือ (แพ็ค)</th>
-                        <th scope="col" class="text-end">คงเหลือ (@item.SaleUnit)</th>
-                        <th scope="col" class="text-end">ขนาดบรรจุ</th>
-                        <th scope="col">วันหมดอายุ</th>
-                        <th scope="col">เลขที่ผลิต</th>
-                        <th scope="col">ที่เก็บ</th>
-                        <th scope="col" class="text-end">มูลค่า (บาท)</th>
-                        <th scope="col">ผู้จำหน่าย</th>
-                        <th scope="col">ผู้ผลิต</th>
-                    </tr>
-                </thead>
-                <tbody>
-                @{ var n = 0; }
-                @foreach (var lot in item.Lots)
-                {
-                    n++;
-                    var expired = lot.ExpiredDate is { } d && d.Date < DateTime.Today;
-                    <tr class="@(expired ? "table-danger" : null)">
-                        <td class="text-end text-muted">@n</td>
-                        <td>@lot.TradeName</td>
-                        <td class="text-end">@(lot.Packs?.ToString("N2") ?? "–")</td>
-                        <td class="text-end">@lot.QtyOnHand.ToString("N0")</td>
-                        <td class="text-end">@lot.PackRatio.ToString("N0")</td>
-                        <td>@(lot.ExpiredDate?.ToString("d MMM yyyy"))</td>
-                        <td>@lot.LotNo</td>
-                        <td>@lot.Location</td>
-                        <td class="text-end">@(lot.LotValue?.ToString("N2"))</td>
-                        <td>@(lot.VendorName ?? lot.VendorCode)</td>
-                        <td>@(lot.ManufacName ?? lot.ManufacCode)</td>
-                    </tr>
-                }
-                </tbody>
-                <tfoot class="table-light fw-semibold">
-                    <tr>
-                        <td colspan="3" class="text-end">รวมล็อต</td>
-                        <td class="text-end">@rec.LotQtySum.ToString("N0")</td>
-                        <td colspan="4"></td>
-                        <td class="text-end">@rec.LotValueSum.ToString("N2")</td>
-                        <td colspan="2"></td>
-                    </tr>
-                    <tr>
-                        <td colspan="3" class="text-end">ยอดคลัง (INV_MD)</td>
-                        <td class="text-end">@rec.HeaderQty.ToString("N0")</td>
-                        <td colspan="4"></td>
-                        <td class="text-end">@rec.HeaderValue.ToString("N2")</td>
-                        <td colspan="2"></td>
-                    </tr>
-                    @if (!rec.IsConsistent)
-                    {
-                        <tr class="table-warning">
-                            <td colspan="3" class="text-end">ผลต่าง</td>
-                            <td class="text-end">@rec.QtyDelta.ToString("N0")</td>
-                            <td colspan="4"></td>
-                            <td class="text-end">@rec.ValueDelta.ToString("N2")</td>
-                            <td colspan="2"></td>
-                        </tr>
-                    }
-                </tfoot>
-            </table>
-        </div>
-        <p class="text-muted small">แถวสีแดง = ล็อตที่หมดอายุแล้ว (เทียบกับวันนี้)</p>
-    }
-}
+</div>
