@@ -65,8 +65,40 @@ public sealed record DashboardMovementRow(string MonthKey, string? Status, strin
 
 public sealed record DashboardMovementCategory(MovementCategory Category, int Count, decimal Value, decimal Quantity);
 
+/// <summary>
+/// Item-type dimension of the same CARD rows (2026-09-18): CARD.WORKING_CODE → INV_MD.ED_NED → TBLED_NED (EDCODE/EDNAME),
+/// resolved with deterministic TOP 1 lookups so CARD rows are never multiplied. Orthogonal to <see cref="MovementCategory"/>
+/// (RO/RS/SS/SO = transaction direction/source). Null/blank/unmapped codes stay as an explicit "ไม่ระบุประเภท" bucket.
+/// </summary>
+public sealed record DashboardMovementItemTypeRow(string MonthKey, string? Status, string? NumberPrefix, string? ItemTypeCode, string? ItemTypeName, int Count, decimal Value, decimal Quantity);
+
+/// <summary>Per-month value of one item type by direction (presentation aggregation only).</summary>
+public sealed record DashboardMovementTypeSummary(string Code, string Name, decimal ReceiveValue, decimal IssueValue, decimal OtherValue, int Count)
+{
+    public const string UnknownCode = "?";
+    public const string UnknownName = "ไม่ระบุประเภท";
+    public bool IsUnknown => Code == UnknownCode;
+    public bool HasValue => ReceiveValue != 0m || IssueValue != 0m || OtherValue != 0m;
+}
+
 public sealed record DashboardMovementMonth(string MonthKey, IReadOnlyList<DashboardMovementCategory> Categories)
 {
+    /// <summary>Item-type breakdown (codes 1–5 + unknown), EDCODE order; empty when the type query was not supplied.</summary>
+    public IReadOnlyList<DashboardMovementTypeSummary> ItemTypes { get; init; } = [];
+
+    public DashboardMovementTypeSummary? Type(string code) => ItemTypes.FirstOrDefault(t => t.Code == code);
+
+    /// <summary>ยา รวม = ED (1) + NED (2): a subtotal for display, never added to the grand total.</summary>
+    public decimal DrugReceiveValue => (Type("1")?.ReceiveValue ?? 0m) + (Type("2")?.ReceiveValue ?? 0m);
+    public decimal DrugIssueValue => (Type("1")?.IssueValue ?? 0m) + (Type("2")?.IssueValue ?? 0m);
+    public decimal DrugOtherValue => (Type("1")?.OtherValue ?? 0m) + (Type("2")?.OtherValue ?? 0m);
+
+    /// <summary>Parity invariants: the type dimension must re-add to the D9 totals of this month.</summary>
+    public decimal TypeReceiveTotal => ItemTypes.Sum(t => t.ReceiveValue);
+    public decimal TypeIssueTotal => ItemTypes.Sum(t => t.IssueValue);
+    public decimal TypeOtherTotal => ItemTypes.Sum(t => t.OtherValue);
+    public bool TypesMatchTotals => ItemTypes.Count > 0 && TypeReceiveTotal == ReceiveValue && TypeIssueTotal == IssueValue && TypeOtherTotal == OtherValue;
+
     public decimal ReceiveValue => Categories.Where(c => c.Category.Direction == MovementDirection.Receive).Sum(c => c.Value);
     public decimal IssueValue => Categories.Where(c => c.Category.Direction == MovementDirection.Issue).Sum(c => c.Value);
     public decimal OtherValue => Categories.Where(c => c.Category.Direction == MovementDirection.Other).Sum(c => c.Value);
@@ -90,6 +122,30 @@ public static class DashboardMovement
                 g.GroupBy(r => MovementCategory.FromRaw(r.Status, r.NumberPrefix))
                  .Select(c => new DashboardMovementCategory(c.Key, c.Sum(r => r.Count), c.Sum(r => r.Value), c.Sum(r => r.Quantity)))
                  .OrderBy(c => c.Category.Key, StringComparer.Ordinal).ToList()))
+            .ToList();
+
+    /// <summary>
+    /// D9 months (unchanged) plus the item-type breakdown of each month from the typed rows. Direction of a typed row uses the
+    /// same <see cref="MovementCategory.FromRaw"/> rule as the totals, so per-month type sums equal ReceiveValue / IssueValue / OtherValue.
+    /// </summary>
+    public static IReadOnlyList<DashboardMovementMonth> Build(IEnumerable<DashboardMovementRow> rows, IEnumerable<DashboardMovementItemTypeRow> typedRows)
+    {
+        var byMonth = typedRows.GroupBy(r => r.MonthKey).ToDictionary(g => g.Key, g => g.ToList());
+        return Build(rows).Select(m => m with { ItemTypes = byMonth.TryGetValue(m.MonthKey, out var t) ? Summarize(t) : [] }).ToList();
+    }
+
+    internal static IReadOnlyList<DashboardMovementTypeSummary> Summarize(IEnumerable<DashboardMovementItemTypeRow> rows)
+        => rows
+            .GroupBy(r => string.IsNullOrWhiteSpace(r.ItemTypeCode) ? DashboardMovementTypeSummary.UnknownCode : r.ItemTypeCode!.Trim())
+            .Select(g =>
+            {
+                var code = g.Key;
+                var name = code == DashboardMovementTypeSummary.UnknownCode ? DashboardMovementTypeSummary.UnknownName
+                         : g.Select(r => r.ItemTypeName).FirstOrDefault(n => !string.IsNullOrWhiteSpace(n)) ?? $"รหัส {code} (ไม่พบใน TBLED_NED)";
+                decimal Sum(MovementDirection d) => g.Where(r => MovementCategory.FromRaw(r.Status, r.NumberPrefix).Direction == d).Sum(r => r.Value);
+                return new DashboardMovementTypeSummary(code, name, Sum(MovementDirection.Receive), Sum(MovementDirection.Issue), Sum(MovementDirection.Other), g.Sum(r => r.Count));
+            })
+            .OrderBy(t => t.IsUnknown ? 1 : 0).ThenBy(t => t.Code, StringComparer.Ordinal)
             .ToList();
 }
 
@@ -188,6 +244,9 @@ public interface IDashboardAnalyticsRepository
     Task<IReadOnlyList<DashboardEdNedRow>> GetLegacyEdNedAsync(CancellationToken ct = default);
     Task<IReadOnlyList<DashboardAgreementRow>> GetActiveAgreementsAsync(DateTime today, CancellationToken ct = default);
     Task<IReadOnlyList<DashboardMovementRow>> GetMovementAsync(int fiscalYear, CancellationToken ct = default);
+
+    /// <summary>Same CARD window as <see cref="GetMovementAsync"/>, additionally grouped by the item's ED_NED type (TBLED_NED).</summary>
+    Task<IReadOnlyList<DashboardMovementItemTypeRow>> GetMovementByItemTypeAsync(int fiscalYear, CancellationToken ct = default);
     Task<IReadOnlyList<DashboardProcessTimeRow>> GetProcessTimeAsync(int fiscalYear, CancellationToken ct = default);
     Task<DashboardItemTrend?> GetItemTrendAsync(string workingCode, int months, CancellationToken ct = default);
 }

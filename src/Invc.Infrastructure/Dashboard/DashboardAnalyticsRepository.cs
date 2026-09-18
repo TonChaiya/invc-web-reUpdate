@@ -68,6 +68,28 @@ internal static class DashboardSql
         ORDER BY YEAR(c.OPERATE_DATE) DESC, MONTH(c.OPERATE_DATE) DESC, c.R_S_STATUS, LEFT(c.R_S_NUMBER, 1)
         """;
 
+    /// <summary>
+    /// D9 by item type (2026-09-18): the same CARD window grouped additionally by INV_MD.ED_NED → TBLED_NED. Lookups are
+    /// OUTER APPLY TOP 1 (deterministic, never multiply CARD rows; audit FY2569: 1958 = 1958 rows); rows whose item or type
+    /// cannot be resolved keep a NULL type and are surfaced as "ไม่ระบุประเภท" in Core. No LOCATION / GROUP_CODE involved.
+    /// </summary>
+    public const string MovementByItemType = """
+        SELECT CAST(YEAR(c.OPERATE_DATE) + 543 AS varchar(4)) + RIGHT('0' + CAST(MONTH(c.OPERATE_DATE) AS varchar(2)), 2) AS MonthKey,
+               c.R_S_STATUS AS Status,
+               LEFT(c.R_S_NUMBER, 1) AS NumberPrefix,
+               md.ItemTypeCode,
+               t.ItemTypeName,
+               COUNT(*) AS [Count],
+               ISNULL(SUM(c.[VALUE]), 0) AS Value,
+               ISNULL(SUM(ISNULL(c.ACTIVE_QTY1, 0) + ISNULL(c.ACTIVE_QTY2, 0) + ISNULL(c.ACTIVE_QTY3, 0)), 0) AS Quantity
+        FROM dbo.CARD c
+        OUTER APPLY (SELECT TOP 1 RTRIM(m.ED_NED) AS ItemTypeCode FROM dbo.INV_MD m WHERE m.WORKING_CODE = c.WORKING_CODE ORDER BY m.RECORD_NUMBER) md
+        OUTER APPLY (SELECT TOP 1 RTRIM(x.EDNAME) AS ItemTypeName FROM dbo.TBLED_NED x WHERE x.EDCODE = md.ItemTypeCode ORDER BY x.EDCODE) t
+        WHERE c.OPERATE_DATE >= @From AND c.OPERATE_DATE < @To
+        GROUP BY YEAR(c.OPERATE_DATE), MONTH(c.OPERATE_DATE), c.R_S_STATUS, LEFT(c.R_S_NUMBER, 1), md.ItemTypeCode, t.ItemTypeName
+        ORDER BY YEAR(c.OPERATE_DATE) DESC, MONTH(c.OPERATE_DATE) DESC, md.ItemTypeCode, c.R_S_STATUS, LEFT(c.R_S_NUMBER, 1)
+        """;
+
     /// <summary>C11 — Dashboard.asp / ipiss_process.asp process time per PO month (fiscal year by PO_NO prefix, as Phase 4).</summary>
     public const string ProcessTime = """
         SELECT LEFT(CONVERT(varchar(8), p.PO_DATE, 112), 6) AS PoMonth,
@@ -101,7 +123,7 @@ internal static class DashboardSql
     public static IEnumerable<string> AllStatements()
     {
         yield return Budget; yield return Substock; yield return StockCoverage; yield return LegacyEdNed;
-        yield return ActiveAgreements; yield return Movement; yield return ProcessTime; yield return ItemHeader; yield return ItemTrend;
+        yield return ActiveAgreements; yield return Movement; yield return MovementByItemType; yield return ProcessTime; yield return ItemHeader; yield return ItemTrend;
     }
 }
 
@@ -146,6 +168,13 @@ public sealed class DashboardAnalyticsRepository(ISqlConnectionFactory connectio
         var (from, to) = NonPoReceiptRepository.FiscalYearWindow(fiscalYear);
         await using var c = await connections.OpenAsync(ct).ConfigureAwait(false);
         return (await c.QueryAsync<DashboardMovementRow>(Cmd(DashboardSql.Movement, new { From = from, To = to }, ct)).ConfigureAwait(false)).AsList();
+    }
+
+    public async Task<IReadOnlyList<DashboardMovementItemTypeRow>> GetMovementByItemTypeAsync(int fiscalYear, CancellationToken ct = default)
+    {
+        var (from, to) = NonPoReceiptRepository.FiscalYearWindow(fiscalYear);
+        await using var c = await connections.OpenAsync(ct).ConfigureAwait(false);
+        return (await c.QueryAsync<DashboardMovementItemTypeRow>(Cmd(DashboardSql.MovementByItemType, new { From = from, To = to }, ct)).ConfigureAwait(false)).AsList();
     }
 
     public async Task<IReadOnlyList<DashboardProcessTimeRow>> GetProcessTimeAsync(int fiscalYear, CancellationToken ct = default)

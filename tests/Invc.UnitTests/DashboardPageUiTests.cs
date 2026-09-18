@@ -102,6 +102,12 @@ public sealed class DashboardPageUiTests : IClassFixture<DashboardPageUiTests.Fa
             new("256810", "R", "O", 3, 12_000m, 300), new("256810", "S", "S", 10, 9_000m, 900),
             new("256811", "R", "O", 1, 4_000m, 100), new("256811", "S", "O", 4, 2_500m, 250),
         ]);
+        public Task<IReadOnlyList<DashboardMovementItemTypeRow>> GetMovementByItemTypeAsync(int fy, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<DashboardMovementItemTypeRow>>(
+        [
+            new("256810", "R", "O", "1", "ยาในบัญชียาหลักแห่งชาติ", 2, 9_000m, 200), new("256810", "R", "O", "3", "วัสดุการแพทย์", 1, 3_000m, 100),
+            new("256810", "S", "S", "1", "ยาในบัญชียาหลักแห่งชาติ", 8, 7_500m, 700), new("256810", "S", "S", "2", "ยานอกบัญชียาหลักแห่งชาติ", 2, 1_500m, 200),
+            new("256811", "R", "O", "1", "ยาในบัญชียาหลักแห่งชาติ", 1, 4_000m, 100), new("256811", "S", "O", "3", "วัสดุการแพทย์", 4, 2_500m, 250),
+        ]);
         public Task<IReadOnlyList<DashboardProcessTimeRow>> GetProcessTimeAsync(int fy, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<DashboardProcessTimeRow>>([]);
         public Task<DashboardItemTrend?> GetItemTrendAsync(string code, int months, CancellationToken ct = default)
             => Task.FromResult<DashboardItemTrend?>(code == "1000123" ? new DashboardItemTrend("1000123", "AMOXICILLIN 500 MG CAP", 12_500, "แคปซูล", [new("256808", 500, 1_000m), new("256809", 250, 500m)]) : null);
@@ -192,9 +198,25 @@ public sealed class DashboardPageUiTests : IClassFixture<DashboardPageUiTests.Fa
         var move = Regex.Match(html, "<section class=\"dashboard-section dashboard-movement\".*?</section>", RegexOptions.Singleline).Value;
         Assert.Contains("class=\"ds-table dashboard-movement-table\"", move);
         var mt = Text(move);
-        Assert.Contains("ต.ค. 2568 12,000.00 9,000.00 13", mt);
+        Assert.Contains("ต.ค. 2568 ดูแยกหมวดเวชภัณฑ์ ▾ 12,000.00 9,000.00 13", mt);   // month totals unchanged, expander label beside the month
         Assert.Contains("รวม 16,000.00 11,500.00 18", mt);
-        Assert.Contains("<summary>รายละเอียดประเภท</summary>", move);          // legacy codes only behind disclosure
+        Assert.Contains("<summary>ดูประเภทรายการเคลื่อนไหว (RO / RS / SS / SO)</summary>", move);   // transaction categories only behind disclosure
+        // per-month item-type expander (CARD → INV_MD.ED_NED → TBLED_NED): one per month, ยา รวม + ED + NED always, other live types when non-zero
+        Assert.Equal(2, Regex.Matches(move, "for=\"mt-\\d{6}\">ดูแยกหมวดเวชภัณฑ์").Count);
+        Assert.Equal(2, Regex.Matches(move, "<div class=\"dashboard-type-panel\"").Count);
+        var oct = Regex.Match(move, "<div class=\"dashboard-type-panel\" id=\"mt-panel-256810\">.*?</div>", RegexOptions.Singleline).Value;
+        var ot = Text(oct);
+        Assert.Contains("หมวดเวชภัณฑ์ รับเข้า จ่ายออก", ot);
+        Assert.Contains("ยา รวม (ED + NED) 9,000.00 9,000.00", ot);
+        Assert.Contains("ยาในบัญชียาหลักแห่งชาติ (ED) 9,000.00 7,500.00", ot);
+        Assert.Contains("ยานอกบัญชียาหลักแห่งชาติ (NED) 0.00 1,500.00", ot);
+        Assert.Contains("วัสดุการแพทย์ (3) 3,000.00 0.00", ot);
+        Assert.DoesNotContain("ยาตัวอย่าง", ot);                                        // zero / absent type 5 hidden
+        Assert.DoesNotContain("ไม่ระบุประเภท", ot);                                       // no unknown rows in this fixture
+        Assert.Contains("รวม 12,000.00 9,000.00", ot);                                    // equals the month totals (parity)
+        Assert.DoesNotContain("ยอดแยกหมวดไม่ตรง", oct);
+        Assert.DoesNotContain("dashboard-panel", move.Replace("dashboard-type-panel", ""));   // no category card wall
+        Assert.DoesNotContain("<script", move);
         Assert.DoesNotContain("<th scope=\"col\">ประเภท (รหัสเดิม)</th>", move);
         Assert.Contains("dashboard-bar dashboard-bar--in", move);
         Assert.DoesNotContain("chart.js", html, StringComparison.OrdinalIgnoreCase);

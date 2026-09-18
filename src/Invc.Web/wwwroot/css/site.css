@@ -517,6 +517,22 @@ a:focus-visible, button:focus-visible, .btn:focus-visible, .form-control:focus-v
 .dashboard-bar--in { background: var(--teal); opacity: .75; }
 .dashboard-bar--out { background: var(--primary); opacity: .7; }
 .dashboard-movement-detail { margin-top: var(--sp-3); }
+/* per-month item-type expander (CSS-only: label -> hidden checkbox -> panel) */
+.dashboard-type-toggle { display: block; margin-top: 2px; font-size: .78rem; font-weight: 500; color: var(--primary); cursor: pointer; white-space: nowrap; }
+.dashboard-type-toggle:hover { text-decoration: underline; }
+.dashboard-type-check { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.dashboard-type-check:focus-visible + .dashboard-type-panel { outline: 3px solid var(--primary-ring); }
+.dashboard-movement-table .dashboard-type-row > td { padding: 0; border-bottom: 0; }
+.dashboard-type-panel { display: none; margin: 0 var(--sp-4) var(--sp-3); padding: var(--sp-2) var(--sp-4); background: var(--surface-soft); border: 1px solid var(--border); border-left: 3px solid var(--teal); border-radius: var(--radius); }
+.dashboard-type-check:checked + .dashboard-type-panel { display: block; }
+.dashboard-type-table { width: auto; min-width: 34rem; border-collapse: collapse; font-size: .86rem; font-variant-numeric: tabular-nums; }
+.dashboard-type-table th, .dashboard-type-table td { padding: 4px var(--sp-3); border-bottom: 1px solid var(--border); }
+.dashboard-type-table thead th { font-size: .74rem; font-weight: 500; color: var(--text-tertiary); text-align: left; }
+.dashboard-type-table tbody tr.is-subtotal td { font-weight: 600; color: var(--text-primary); }
+.dashboard-type-table tbody tr.is-child td:first-child { padding-left: calc(var(--sp-3) + 1.2rem); color: var(--text-secondary); }
+.dashboard-type-table tbody tr.is-unknown td { color: var(--warning); }
+.dashboard-type-table tfoot td { font-weight: 650; color: var(--text-primary); border-bottom: 0; border-top: 1px solid var(--border-strong); }
+.dashboard-type-warn { margin: var(--sp-2) 0 0; font-size: .82rem; color: var(--danger); }
 .dashboard-trend-form { margin-bottom: var(--sp-3); }
 .dashboard-trend-form .ds-input { flex: 0 1 12rem; }
 .dashboard-trend-identity { margin: 0 0 var(--sp-2); font-size: .95rem; }

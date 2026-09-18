@@ -322,6 +322,7 @@ public class DashboardParityTests(ProductionReadOnlyFixture db, ITestOutputHelpe
         public Task<IReadOnlyList<DashboardEdNedRow>> GetLegacyEdNedAsync(CancellationToken ct = default) => throw Boom();
         public Task<IReadOnlyList<DashboardAgreementRow>> GetActiveAgreementsAsync(DateTime today, CancellationToken ct = default) => throw Boom();
         public Task<IReadOnlyList<DashboardMovementRow>> GetMovementAsync(int fiscalYear, CancellationToken ct = default) => throw Boom();
+        public Task<IReadOnlyList<DashboardMovementItemTypeRow>> GetMovementByItemTypeAsync(int fiscalYear, CancellationToken ct = default) => throw Boom();
         public Task<IReadOnlyList<DashboardProcessTimeRow>> GetProcessTimeAsync(int fiscalYear, CancellationToken ct = default) => throw Boom();
         public Task<DashboardItemTrend?> GetItemTrendAsync(string workingCode, int months, CancellationToken ct = default) => throw Boom();
     }

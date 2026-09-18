@@ -308,10 +308,17 @@ else
                             <th scope="col" class="ds-col-num">รายการ</th>
                         </tr></thead>
                         <tbody>
+                        @{ var colCount = hasOther ? 7 : 6; }
                         @foreach (var m in mv)
                         {
                             <tr class="ds-row">
-                                <td class="dashboard-month">@m.DisplayMonth</td>
+                                <td class="dashboard-month">
+                                    @m.DisplayMonth
+                                    @if (m.ItemTypes.Count > 0)
+                                    {
+                                        <label class="dashboard-type-toggle" for="mt-@m.MonthKey">ดูแยกหมวดเวชภัณฑ์ <span aria-hidden="true">▾</span></label>
+                                    }
+                                </td>
                                 <td class="ds-col-num ds-number">@m.ReceiveValue.ToString("N2")</td>
                                 <td class="dashboard-bar-col" aria-hidden="true"><span class="dashboard-bar dashboard-bar--in" style="width:@(maxFlow > 0 ? (100m * m.ReceiveValue / maxFlow).ToString("N0") : "0")%"></span></td>
                                 <td class="ds-col-num ds-number">@m.IssueValue.ToString("N2")</td>
@@ -319,6 +326,54 @@ else
                                 @if (hasOther) { <td class="ds-col-num ds-number">@m.OtherValue.ToString("N2")</td> }
                                 <td class="ds-col-num ds-number">@m.Count.ToString("N0")</td>
                             </tr>
+                            @if (m.ItemTypes.Count > 0)
+                            {
+                                @* item-type breakdown of THIS month (CARD → INV_MD.ED_NED → TBLED_NED); CSS-only expander, no script *@
+                                <tr class="dashboard-type-row">
+                                    <td colspan="@colCount" class="dashboard-type-cell">
+                                        <input type="checkbox" id="mt-@m.MonthKey" class="dashboard-type-check" />
+                                        <div class="dashboard-type-panel" id="mt-panel-@m.MonthKey">
+                                            <table class="dashboard-type-table" aria-label="แยกหมวดเวชภัณฑ์ @m.DisplayMonth">
+                                                <thead><tr><th scope="col">หมวดเวชภัณฑ์</th><th scope="col" class="ds-col-num">รับเข้า</th><th scope="col" class="ds-col-num">จ่ายออก</th>@if (hasOther) { <th scope="col" class="ds-col-num">อื่น ๆ</th> }</tr></thead>
+                                                <tbody>
+                                                    <tr class="is-subtotal">
+                                                        <td>ยา รวม <span class="dashboard-muted">(ED + NED)</span></td>
+                                                        <td class="ds-col-num ds-number">@m.DrugReceiveValue.ToString("N2")</td>
+                                                        <td class="ds-col-num ds-number">@m.DrugIssueValue.ToString("N2")</td>
+                                                        @if (hasOther) { <td class="ds-col-num ds-number">@m.DrugOtherValue.ToString("N2")</td> }
+                                                    </tr>
+                                                    @foreach (var code in new[] { "1", "2" })
+                                                    {
+                                                        var tt = m.Type(code);
+                                                        <tr class="is-child">
+                                                            <td>@(tt?.Name ?? (code == "1" ? "ยาในบัญชียาหลักแห่งชาติ" : "ยานอกบัญชียาหลักแห่งชาติ")) <span class="dashboard-muted">(@(code == "1" ? "ED" : "NED"))</span></td>
+                                                            <td class="ds-col-num ds-number">@((tt?.ReceiveValue ?? 0m).ToString("N2"))</td>
+                                                            <td class="ds-col-num ds-number">@((tt?.IssueValue ?? 0m).ToString("N2"))</td>
+                                                            @if (hasOther) { <td class="ds-col-num ds-number">@((tt?.OtherValue ?? 0m).ToString("N2"))</td> }
+                                                        </tr>
+                                                    }
+                                                    @foreach (var tt in m.ItemTypes.Where(x => x.Code != "1" && x.Code != "2" && (x.HasValue || !x.IsUnknown)))
+                                                    {
+                                                        <tr class="@(tt.IsUnknown ? "is-unknown" : "")">
+                                                            <td>@tt.Name @if (!tt.IsUnknown) { <span class="dashboard-muted">(@tt.Code)</span> }</td>
+                                                            <td class="ds-col-num ds-number">@tt.ReceiveValue.ToString("N2")</td>
+                                                            <td class="ds-col-num ds-number">@tt.IssueValue.ToString("N2")</td>
+                                                            @if (hasOther) { <td class="ds-col-num ds-number">@tt.OtherValue.ToString("N2")</td> }
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                                <tfoot><tr>
+                                                    <td>รวม</td>
+                                                    <td class="ds-col-num ds-number">@m.TypeReceiveTotal.ToString("N2")</td>
+                                                    <td class="ds-col-num ds-number">@m.TypeIssueTotal.ToString("N2")</td>
+                                                    @if (hasOther) { <td class="ds-col-num ds-number">@m.TypeOtherTotal.ToString("N2")</td> }
+                                                </tr></tfoot>
+                                            </table>
+                                            @if (!m.TypesMatchTotals) { <p class="dashboard-type-warn" role="status">ยอดแยกหมวดไม่ตรงกับยอดรวมของเดือน</p> }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
                         }
                         </tbody>
                         <tfoot><tr>
@@ -331,7 +386,7 @@ else
                     </table>
                 </div>
                 <details class="ds-help dashboard-movement-detail">
-                    <summary>รายละเอียดประเภท</summary>
+                    <summary>ดูประเภทรายการเคลื่อนไหว (RO / RS / SS / SO)</summary>
                     <ul class="mb-0 mt-2">
                         <li>รหัสประเภท = R_S_STATUS + อักษรแรกของเลขที่เอกสาร (RO รับจากใบรับอื่น, RS รับคืนจากคลังย่อย, SS จ่ายให้คลังย่อย, SO จ่ายออกอื่น) — รวมทุกประเภทตามระบบเดิม</li>
                         @foreach (var m in mv)
