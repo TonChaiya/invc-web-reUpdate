@@ -69,9 +69,63 @@ public static class InventoryRules
     /// </summary>
     public static decimal? PacksOnHand(decimal qtyOnHand, decimal packRatio)
         => packRatio <= 0m ? null : qtyOnHand / packRatio;
+
+    /// <summary>
+    /// Per-lot pack expression for the quick lot view: "2 × 100", "2 × 100 + 50", "40" (less than one pack).
+    /// Each lot keeps its own PACK_RATIO — ratios are never merged across lots. Returns null when the ratio is
+    /// 1 or invalid (≤ 0) or the quantity is not positive, so the caller shows only the total quantity.
+    /// </summary>
+    /// <summary>
+    /// Owner-defined expiry attention levels for the lot views (2026-09-18): expired → <see cref="ExpiryStatus.Expired"/>;
+    /// expiring within 1 month → <see cref="ExpiryStatus.Within1Month"/>; within 3 months → <see cref="ExpiryStatus.Within3Months"/>;
+    /// otherwise <see cref="ExpiryStatus.Ok"/>. No date → Unknown. Compared by calendar date (time ignored).
+    /// </summary>
+    public static ExpiryStatus ClassifyExpiry(DateTime? expiredDate, DateTime today)
+    {
+        if (expiredDate is null)
+        {
+            return ExpiryStatus.Unknown;
+        }
+
+        var exp = expiredDate.Value.Date;
+        var day = today.Date;
+        if (exp < day) return ExpiryStatus.Expired;
+        if (exp <= day.AddMonths(1)) return ExpiryStatus.Within1Month;
+        if (exp <= day.AddMonths(3)) return ExpiryStatus.Within3Months;
+        return ExpiryStatus.Ok;
+    }
+
+    public static string? PackExpression(decimal qtyOnHand, decimal packRatio)
+    {
+        if (packRatio <= 1m || qtyOnHand <= 0m)
+        {
+            return null;
+        }
+
+        var packs = Math.Floor(qtyOnHand / packRatio);
+        var remainder = qtyOnHand - packs * packRatio;
+        var ratio = packRatio.ToString("#,##0.##", CultureInfo.InvariantCulture);
+        var rem = remainder.ToString("#,##0.##", CultureInfo.InvariantCulture);
+        if (packs == 0m)
+        {
+            return rem;
+        }
+
+        var head = $"{packs.ToString("#,##0", CultureInfo.InvariantCulture)} × {ratio}";
+        return remainder == 0m ? head : $"{head} + {rem}";
+    }
 }
 
 /// <summary>Reorder status bucket used by INV_Report_Purchase.asp (red/yellow/green).</summary>
+public enum ExpiryStatus
+{
+    Unknown,
+    Ok,
+    Within3Months,
+    Within1Month,
+    Expired,
+}
+
 public enum ReorderStatus
 {
     Red,

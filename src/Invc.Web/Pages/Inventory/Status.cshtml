@@ -43,10 +43,19 @@
             </div>
         }
 
-        <p class="ds-result-meta inventory-result-meta" aria-live="polite">
-            แสดง @Model.Items.Count.ToString("N0") รายการ
-            @if (Model.IsFiltered) { <text>· ค้นหา “@Model.Keyword”</text> }
-        </p>
+        <div class="inventory-result-bar">
+            <p class="ds-result-meta inventory-result-meta" aria-live="polite">
+                แสดง @Model.Items.Count.ToString("N0") รายการ
+                @if (Model.IsFiltered) { <text>· ค้นหา “@Model.Keyword”</text> }
+            </p>
+            @if (Model.Items.Count > 0)
+            {
+                <button type="button" class="ds-btn ds-btn-secondary ds-btn-sm" id="inventory-lots-all"
+                        data-q="@Model.Keyword" aria-pressed="false" hidden>
+                    <span class="inventory-lots-all-text">แสดงล็อตทั้งหมด</span>
+                </button>
+            }
+        </div>
 
         @if (Model.Items.Count == 0)
         {
@@ -74,6 +83,7 @@
                             <th scope="col" class="inventory-col-num">เหลือใช้ได้ (เดือน)</th>
                             <th scope="col" class="inventory-col-num inventory-col-secondary">อัตราใช้/เดือน</th>
                             <th scope="col" class="inventory-col-num inventory-col-secondary">ยืมได้</th>
+                            <th scope="col" class="inventory-col-toggle"><span class="visually-hidden">ล็อต</span></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -100,6 +110,16 @@
                             <td class="inventory-col-num inventory-number @(item.RatePerMonth is null or 0m ? "inventory-number--na" : "")">@item.MonthsOfStockDisplay</td>
                             <td class="inventory-col-num inventory-number inventory-col-secondary">@(item.RatePerMonth?.ToString("N0") ?? "–")</td>
                             <td class="inventory-col-num inventory-number inventory-col-secondary">@item.BorrowableQty.ToString("N0")</td>
+                            <td class="inventory-col-toggle">
+                                <button type="button" class="inventory-lot-toggle" data-working-code="@item.WorkingCode"
+                                        aria-expanded="false" aria-controls="lots-@item.WorkingCode">
+                                    <span class="inventory-lot-toggle-text">ดูล็อต</span>
+                                    <svg class="inventory-lot-toggle-icon" viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M5 8l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                </button>
+                            </td>
+                        </tr>
+                        <tr class="inventory-lot-panel-row" id="lots-@item.WorkingCode" hidden>
+                            <td colspan="7" class="inventory-lot-panel-cell" data-lot-slot="@item.WorkingCode" data-loaded="false"></td>
                         </tr>
                     }
                     </tbody>
@@ -135,3 +155,7 @@
         }
     }
 </div>
+
+@section Scripts {
+    <script src="~/js/inventory-lots.js" asp-append-version="true"></script>
+}

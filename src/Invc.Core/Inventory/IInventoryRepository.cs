@@ -21,6 +21,12 @@ public interface IInventoryRepository
     Task<InventoryItemDetail?> GetDetailAsync(string workingCode, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Every INV_MD_C lot of the items the Status list shows (same active/keyword filter), ordered by item then expiry —
+    /// one SELECT for the "show all lots" action of the Status page. Never used during the list render itself.
+    /// </summary>
+    Task<IReadOnlyList<InventoryLot>> GetStatusLotsAsync(string? keyword, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Set-based header-vs-lot reconciliation over active items (parity check A10):
     /// one row per active item with lot count and lot sums.
     /// </summary>

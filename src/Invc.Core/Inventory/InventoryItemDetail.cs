@@ -50,6 +50,9 @@ public sealed record InventoryItemDetail
 /// </summary>
 public sealed record InventoryLot
 {
+    /// <summary>Owning item; populated by the Status lot query (all lots of the listed items), empty for Detail lots.</summary>
+    public string WorkingCode { get; init; } = "";
+
     /// <summary>INV_MD_C.PACK_RATIO — sale units per pack.</summary>
     public decimal PackRatio { get; init; }
 

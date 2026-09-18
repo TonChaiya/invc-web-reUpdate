@@ -65,9 +65,20 @@ public sealed class InventoryPageUiTests : IClassFixture<InventoryPageUiTests.Fa
                 Lots =
                 [
                     new() { PackRatio = 500, QtyOnHand = 10_000, ExpiredDate = new DateTime(2027, 12, 31), LotNo = "LOT-A", Location = "A01", LotValue = 15_000m, VendorName = "บริษัท ก", ManufacName = "ผู้ผลิต ก", TradeName = "AMOXY-A" },
-                    new() { PackRatio = 500, QtyOnHand = 2_500, ExpiredDate = new DateTime(2020, 1, 1), LotNo = "LOT-OLD", Location = "A01", LotValue = 3_750.25m, VendorCode = "V2", ManufacCode = "M2", TradeName = "AMOXY-B" },
+                    new() { PackRatio = 100, QtyOnHand = 2_550, ExpiredDate = new DateTime(2020, 1, 1), LotNo = "LOT-OLD", Location = "A01", LotValue = 3_750.25m, VendorCode = "V2", ManufacCode = "M2", TradeName = "AMOXY-B" },
                 ],
             });
+        }
+
+        public int StatusLotsCalls;
+        public Task<IReadOnlyList<InventoryLot>> GetStatusLotsAsync(string? keyword, CancellationToken cancellationToken = default)
+        {
+            StatusLotsCalls++;
+            var detail = GetDetailAsync("1000123").Result!;
+            IReadOnlyList<InventoryLot> lots = keyword is not null && !"AMOXICILLIN 500 MG CAP".Contains(keyword, StringComparison.OrdinalIgnoreCase) && !"1000123".Contains(keyword)
+                ? []
+                : detail.Lots.Select(l => l with { WorkingCode = "1000123" }).ToList();
+            return Task.FromResult(lots);
         }
 
         public Task<IReadOnlyList<ItemLotTotals>> GetLotTotalsAsync(CancellationToken cancellationToken = default)
@@ -171,12 +182,84 @@ public sealed class InventoryPageUiTests : IClassFixture<InventoryPageUiTests.Fa
         Assert.Contains("บัญชียา ยาในบัญชียาหลักแห่งชาติ", all);
         Assert.Contains("VEN / ABC E / A", all);
         Assert.Contains("ส่วนประกอบ Amoxicillin 500 mg", all);
-        Assert.Contains("ยอดล็อตตรงกับยอดคลัง", all);         // 10,000 + 2,500 = 12,500 ; 15,000 + 3,750.25 = 18,750.25
+        Assert.Contains("ยอดล็อตไม่ตรงกับยอดคลัง", all);      // lots 10,000 + 2,550 = 12,550 ≠ header 12,500 (deliberate mismatch fixture)
         Assert.Equal(2, Regex.Matches(html, "<tr class=\"inventory-row[^\"]*\">").Count);
         Assert.Contains("inventory-row--expired", html);
         Assert.Contains(">หมดอายุ</span>", html);                // status text, not colour alone
         Assert.Contains("LOT-OLD", html);
         Assert.Contains("รวมล็อต", all);
+    }
+
+    [Fact]
+    public async Task Status_rows_have_an_accessible_lot_toggle_and_a_hidden_panel_row_without_preloaded_lots()
+    {
+        var (_, html) = await GetAsync("/Inventory/Status");
+        var buttons = Regex.Matches(html, "<button type=\"button\" class=\"inventory-lot-toggle\" data-working-code=\"(\\w+)\"\\s+aria-expanded=\"false\" aria-controls=\"lots-(\\w+)\">");
+        Assert.Equal(3, buttons.Count);
+        Assert.All(buttons.Cast<Match>(), m => Assert.Equal(m.Groups[1].Value, m.Groups[2].Value));
+        Assert.Contains("ดูล็อต", html);
+        Assert.Equal(3, Regex.Matches(html, "<tr class=\"inventory-lot-panel-row\" id=\"lots-\\w+\" hidden>").Count);
+        Assert.Contains("data-lot-slot=\"1000123\" data-loaded=\"false\"></td>", html);   // empty slot: lots are not preloaded
+        Assert.DoesNotContain("inventory-lot-grid", html);
+        Assert.Matches(@"/js/inventory-lots(\.[a-z0-9]+)?\.js", html);   // fingerprinted static asset
+    }
+
+    [Fact]
+    public async Task Lots_handler_returns_the_lot_panel_for_one_medicine_with_per_lot_pack_expressions_and_total_check()
+    {
+        var (code, html) = await GetAsync("/Inventory/Status?handler=Lots&workingCode=1000123");
+        Assert.Equal(HttpStatusCode.OK, code);
+        Assert.DoesNotContain("<html", html);                       // partial only
+        Assert.Contains("class=\"inventory-lot-panel\" data-working-code=\"1000123\"", html);
+        Assert.Equal(2, Regex.Matches(html, "class=\"inventory-lot-row").Count);
+        var text = Text(html);
+        // column order: ชื่อการค้า → Lot → หมดอายุ → จำนวน → ขนาดบรรจุ → รวมของล็อต
+        Assert.Matches("ชื่อการค้า Lot วันหมดอายุ จำนวน .*ขนาดบรรจุ รวมของล็อต", text);
+        Assert.Contains("AMOXY-A Lot LOT-A", text);
+        Assert.Contains("20 × 500", text);                          // 10,000 / 500
+        Assert.Contains("25 × 100 + 50", text);                     // 2,550 / 100 — each lot keeps its own ratio
+        Assert.Contains("รวม 2,550 แคปซูล", text);
+        Assert.Contains("รวมทุกล็อต 12,550 แคปซูล", text);
+        Assert.Contains("ยอดรวมล็อตไม่ตรงกับยอดคลัง (ยอดคลัง 12,500 แคปซูล)", text);
+        // expiry attention: expired lot = strong class + text label; far-future lot = no chip
+        Assert.Contains("inventory-lot-row is-expired", html);
+        Assert.Contains(">หมดอายุ</span>", html);
+        Assert.Single(Regex.Matches(html, "inventory-exp-chip"));
+        Assert.DoesNotContain("บริษัท ก", html);                    // no vendor/manufacturer in the quick view
+        Assert.Contains("href=\"/Inventory/Detail/1000123\"", html);
+    }
+
+    [Fact]
+    public async Task AllLots_handler_returns_one_block_per_listed_item_in_a_single_lot_query()
+    {
+        var (code, html) = await GetAsync("/Inventory/Status?handler=AllLots");
+        Assert.Equal(HttpStatusCode.OK, code);
+        Assert.DoesNotContain("<html", html);
+        Assert.Equal(3, Regex.Matches(html, "<div data-lots-for=\"\\w+\">").Count);   // every listed item, lots or not
+        Assert.Contains("data-lots-for=\"1000123\"", html);
+        Assert.Contains("รวมทุกล็อต 12,550 แคปซูล", Text(html));
+        Assert.Contains("ไม่มีข้อมูลล็อตสำหรับรายการนี้", html);                       // items without lots get an empty panel
+        // keyword narrows both the items and the lots
+        var (_, filtered) = await GetAsync("/Inventory/Status?handler=AllLots&q=sterile");
+        Assert.Single(Regex.Matches(filtered, "<div data-lots-for=\"\\w+\">"));
+        Assert.Contains("data-lots-for=\"3000860\"", filtered);
+    }
+
+    [Fact]
+    public async Task Status_page_has_a_show_all_lots_button_that_is_hidden_without_javascript()
+    {
+        var (_, html) = await GetAsync("/Inventory/Status?q=amox");
+        Assert.Contains("id=\"inventory-lots-all\"", html);
+        Assert.Matches("id=\"inventory-lots-all\"\\s+data-q=\"amox\" aria-pressed=\"false\" hidden>", html);
+        Assert.Contains("แสดงล็อตทั้งหมด", html);
+    }
+
+    [Fact]
+    public async Task Lots_handler_rejects_invalid_or_unknown_codes()
+    {
+        Assert.Equal(HttpStatusCode.NotFound, (await GetAsync("/Inventory/Status?handler=Lots&workingCode=1000123x!")).Code);
+        Assert.Equal(HttpStatusCode.NotFound, (await GetAsync("/Inventory/Status?handler=Lots&workingCode=")).Code);
+        Assert.Equal(HttpStatusCode.NotFound, (await GetAsync("/Inventory/Status?handler=Lots&workingCode=9999999")).Code);
     }
 
     [Fact]

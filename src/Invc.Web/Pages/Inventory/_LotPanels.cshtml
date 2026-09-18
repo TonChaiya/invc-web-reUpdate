@@ -1,0 +1,8 @@
+@model IReadOnlyList<Invc.Web.Pages.Inventory.LotPanelModel>
+@* "แสดงล็อตทั้งหมด": one response carrying the lot panel of every listed item; the script moves each block into its row slot. *@
+@foreach (var panel in Model)
+{
+    <div data-lots-for="@panel.WorkingCode">
+        <partial name="_LotPanel" model="panel" />
+    </div>
+}

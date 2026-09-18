@@ -88,6 +88,45 @@ internal static class InventorySql
         """;
 
     /// <summary>
+    /// Quick lot view for the Status page: all INV_MD_C lots of the active (optionally keyword-filtered) items in one
+    /// statement — same predicate as <see cref="StatusAll"/>/<see cref="StatusSearch"/>, lot columns as in
+    /// <see cref="DetailLots"/> minus vendor/manufacturer (not part of the quick view). Trade name via OUTER APPLY TOP 1
+    /// for the same non-unique DRUG_VN key reason.
+    /// </summary>
+    private const string StatusLotsSelect = """
+        SELECT c.WORKING_CODE  AS WorkingCode,
+               c.PACK_RATIO    AS PackRatio,
+               c.QTY_ON_HAND   AS QtyOnHand,
+               c.EXPIRED_DATE  AS ExpiredDate,
+               c.LOTNO         AS LotNo,
+               c.LOCATION      AS Location,
+               c.LOT_VALUE     AS LotValue,
+               d.TRADE_NAME    AS TradeName
+        FROM dbo.INV_MD_C c
+        INNER JOIN dbo.INV_MD m ON m.WORKING_CODE = c.WORKING_CODE
+        OUTER APPLY (SELECT TOP 1 x.TRADE_NAME FROM dbo.DRUG_VN x
+                     WHERE x.WORKING_CODE = c.WORKING_CODE AND x.PACK_RATIO = c.PACK_RATIO
+                       AND x.VENDOR_CODE = c.VENDOR_CODE AND x.MANUFAC_CODE = c.MANUFAC_CODE
+                     ORDER BY x.RECORD_NUMBER) d
+        """;
+
+    public const string StatusLotsAll = StatusLotsSelect + """
+
+        WHERE m.NOUSE IS NULL
+        ORDER BY c.WORKING_CODE, c.EXPIRED_DATE, c.LOTNO, c.RECORD_NUMBER
+        """;
+
+    public const string StatusLotsSearch = StatusLotsSelect + """
+
+        WHERE m.NOUSE IS NULL
+          AND (   m.DRUG_NAME    LIKE @Pattern
+               OR m.COMPOSITION  LIKE @Pattern
+               OR m.HOSP_CODE    LIKE @Pattern
+               OR m.WORKING_CODE LIKE @Pattern)
+        ORDER BY c.WORKING_CODE, c.EXPIRED_DATE, c.LOTNO, c.RECORD_NUMBER
+        """;
+
+    /// <summary>
     /// Active items (NOUSE IS NULL) grouped by ED/NED class. The page derives its headline totals by summing
     /// these groups, so one statement serves both the cards and the breakdown. LEFT JOIN keeps items whose
     /// ED_NED code has no lookup row (they appear with a NULL name) so the totals stay complete.

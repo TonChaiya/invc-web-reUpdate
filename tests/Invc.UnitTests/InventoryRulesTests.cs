@@ -46,4 +46,33 @@ public class InventoryRulesTests
     [Fact]
     public void SuggestedOrderQty_rounds_fractions_up()
         => Assert.Equal(3m, InventoryRules.SuggestedOrderQty(10.5m, 8m));
+
+    [Theory]
+    [InlineData("2026-09-17", ExpiryStatus.Expired)]        // yesterday
+    [InlineData("2026-09-18", ExpiryStatus.Within1Month)]   // today is not yet expired
+    [InlineData("2026-10-18", ExpiryStatus.Within1Month)]   // exactly one month
+    [InlineData("2026-10-19", ExpiryStatus.Within3Months)]
+    [InlineData("2026-12-18", ExpiryStatus.Within3Months)]  // exactly three months
+    [InlineData("2026-12-19", ExpiryStatus.Ok)]
+    [InlineData(null, ExpiryStatus.Unknown)]
+    public void ClassifyExpiry_uses_owner_thresholds_expired_1_month_3_months(string? exp, ExpiryStatus expected)
+        => Assert.Equal(expected, InventoryRules.ClassifyExpiry(exp is null ? null : DateTime.Parse(exp, System.Globalization.CultureInfo.InvariantCulture), new DateTime(2026, 9, 18, 14, 30, 0)));
+
+    // Quick lot view: each lot keeps its own PACK_RATIO (never merged across lots).
+    [Theory]
+    [InlineData(200, 100, "2 × 100")]
+    [InlineData(250, 100, "2 × 100 + 50")]
+    [InlineData(150, 50, "3 × 50")]
+    [InlineData(40, 100, "40")]          // less than one pack → remainder only
+    [InlineData(1000, 1000, "1 × 1,000")]
+    public void PackExpression_describes_packs_per_lot(int qty, int ratio, string expected)
+        => Assert.Equal(expected, InventoryRules.PackExpression(qty, ratio));
+
+    [Theory]
+    [InlineData(200, 1)]      // ratio 1 → "200 × 1" would be noise
+    [InlineData(200, 0)]
+    [InlineData(200, -5)]
+    [InlineData(0, 100)]
+    public void PackExpression_is_null_when_ratio_or_qty_is_not_meaningful(int qty, int ratio)
+        => Assert.Null(InventoryRules.PackExpression(qty, ratio));
 }

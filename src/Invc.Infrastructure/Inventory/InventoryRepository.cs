@@ -91,6 +91,19 @@ public sealed class InventoryRepository(ISqlConnectionFactory connections) : IIn
         };
     }
 
+    public async Task<IReadOnlyList<InventoryLot>> GetStatusLotsAsync(string? keyword, CancellationToken cancellationToken = default)
+    {
+        var normalized = SearchKeyword.Normalize(keyword);
+        await using var connection = await connections.OpenAsync(cancellationToken).ConfigureAwait(false);
+        var command = normalized is null
+            ? new CommandDefinition(ReadOnlySql.Ensure(InventorySql.StatusLotsAll),
+                commandTimeout: connections.CommandTimeoutSeconds, cancellationToken: cancellationToken)
+            : new CommandDefinition(ReadOnlySql.Ensure(InventorySql.StatusLotsSearch), new { Pattern = LikePattern(normalized) },
+                commandTimeout: connections.CommandTimeoutSeconds, cancellationToken: cancellationToken);
+        var rows = await connection.QueryAsync<InventoryLot>(command).ConfigureAwait(false);
+        return rows.AsList();
+    }
+
     public async Task<IReadOnlyList<ItemLotTotals>> GetLotTotalsAsync(CancellationToken cancellationToken = default)
     {
         await using var connection = await connections.OpenAsync(cancellationToken).ConfigureAwait(false);

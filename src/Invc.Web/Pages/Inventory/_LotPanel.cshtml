@@ -1,0 +1,77 @@
+@using Invc.Core.Inventory
+@model Invc.Web.Pages.Inventory.LotPanelModel
+@{
+    var unit = Model.SaleUnit ?? "";
+    var today = DateTime.Today;
+    static string ExpiryClass(ExpiryStatus s) => s switch
+    {
+        ExpiryStatus.Expired => "is-expired",
+        ExpiryStatus.Within1Month => "is-exp-1m",
+        ExpiryStatus.Within3Months => "is-exp-3m",
+        _ => "",
+    };
+    static string? ExpiryLabel(ExpiryStatus s) => s switch
+    {
+        ExpiryStatus.Expired => "หมดอายุ",
+        ExpiryStatus.Within1Month => "ใกล้หมดอายุ ≤ 1 เดือน",
+        ExpiryStatus.Within3Months => "ใกล้หมดอายุ ≤ 3 เดือน",
+        _ => null,
+    };
+}
+@* Quick operational lot view for one medicine (Inventory Status expander). Intentionally lighter than /Inventory/Detail:
+   ชื่อการค้า → Lot → หมดอายุ → จำนวน (แพ็ค) → ขนาดบรรจุ → รวมของล็อต; all-lot total at the bottom. No vendor/manufacturer. *@
+<div class="inventory-lot-panel" data-working-code="@Model.WorkingCode">
+    @if (Model.Lots.Count == 0)
+    {
+        <p class="inventory-lot-empty" role="status">ไม่มีข้อมูลล็อตสำหรับรายการนี้ (INV_MD_C)</p>
+    }
+    else
+    {
+        <div class="inventory-lot-grid" role="table" aria-label="ล็อตของ @Model.DrugName">
+            <div class="inventory-lot-head" role="row">
+                <span role="columnheader">ชื่อการค้า</span>
+                <span role="columnheader">Lot</span>
+                <span role="columnheader">วันหมดอายุ</span>
+                <span role="columnheader" class="inventory-lot-num">จำนวน (แพ็ค × ขนาด)</span>
+                <span role="columnheader" class="inventory-lot-num">ขนาดบรรจุ</span>
+                <span role="columnheader" class="inventory-lot-num">รวมของล็อต</span>
+            </div>
+            @foreach (var lot in Model.Lots)
+            {
+                var status = InventoryRules.ClassifyExpiry(lot.ExpiredDate, today);
+                var packs = InventoryRules.PackExpression(lot.QtyOnHand, lot.PackRatio);
+                var label = ExpiryLabel(status);
+                <div class="inventory-lot-row @ExpiryClass(status)" role="row">
+                    <span role="cell" class="inventory-lot-name">@(lot.TradeName ?? Model.DrugName)</span>
+                    <span role="cell" class="inventory-lot-no"><span class="inventory-lot-label">Lot</span> <span class="inventory-code">@(lot.LotNo ?? "–")</span></span>
+                    <span role="cell" class="inventory-lot-exp">
+                        <span class="inventory-lot-label">หมดอายุ</span>
+                        <span class="inventory-lot-exp-date">@(lot.ExpiredDate?.ToString("d MMM yyyy") ?? "–")</span>
+                        @if (label is not null) { <span class="inventory-exp-chip">@label</span> }
+                    </span>
+                    <span role="cell" class="inventory-lot-num inventory-lot-qty">
+                        <span class="inventory-lot-label">จำนวน</span>
+                        <span class="inventory-lot-packs">@(packs ?? lot.QtyOnHand.ToString("N0"))</span>
+                    </span>
+                    <span role="cell" class="inventory-lot-num inventory-lot-ratio"><span class="inventory-lot-label">ขนาดบรรจุ</span> <span class="inventory-lot-ratio-value">@lot.PackRatio.ToString("N0")</span></span>
+                    <span role="cell" class="inventory-lot-num inventory-lot-total"><span class="inventory-lot-label">รวม</span> <strong>@lot.QtyOnHand.ToString("N0")</strong> <span class="inventory-lot-unit">@unit</span></span>
+                </div>
+            }
+            <div class="inventory-lot-foot" role="row">
+                <span role="cell" class="inventory-lot-foot-label">รวมทุกล็อต</span>
+                <span role="cell" class="inventory-lot-foot-total"><strong>@Model.LotQtySum.ToString("N0")</strong> <span class="inventory-lot-unit">@unit</span></span>
+                <span role="cell" class="inventory-lot-foot-check">
+                    @if (Model.TotalMatches)
+                    {
+                        <span class="inventory-lot-check inventory-lot-check--ok">ตรงกับยอดคลัง @Model.QtyOnHand.ToString("N0") @unit</span>
+                    }
+                    else
+                    {
+                        <span class="inventory-lot-check inventory-lot-check--warn" role="status">ยอดรวมล็อตไม่ตรงกับยอดคลัง (ยอดคลัง @Model.QtyOnHand.ToString("N0") @unit)</span>
+                    }
+                </span>
+            </div>
+        </div>
+    }
+    <a class="inventory-lot-detail-link" asp-page="/Inventory/Detail" asp-route-workingCode="@Model.WorkingCode">ดูรายละเอียดทั้งหมด →</a>
+</div>

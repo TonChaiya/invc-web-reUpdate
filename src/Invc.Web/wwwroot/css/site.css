@@ -18,6 +18,8 @@
   --success: #39745a; --success-soft: #edf7f1;
   --warning: #9a661e; --warning-soft: #fff6e5;
   --danger: #a84646; --danger-soft: #fdf0f0;
+  /* lot expiry attention (owner rule 2026-09-18): ≤3 months yellow, ≤1 month orange, expired strong red */
+  --exp-3m: #f5d54a; --exp-3m-soft: #fff9dd; --exp-1m: #e07a12; --exp-1m-soft: #fff0df; --exp-expired: #d32f2f; --exp-expired-soft: #ffe3e3;
   --radius-sm: 6px; --radius: 8px; --radius-lg: 12px;
   --shadow-1: 0 1px 2px rgba(16, 24, 40, .05);
   --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px; --sp-6: 24px; --sp-8: 32px;
@@ -424,6 +426,89 @@ a.metric-card:hover { border-color: var(--app-primary); box-shadow: 0 2px 8px rg
 .inventory-kv-grid dd { margin: 0; color: var(--text-primary); overflow-wrap: anywhere; }
 .inventory-delta { display: block; margin-top: var(--sp-1); font-size: .85rem; color: var(--warning); font-variant-numeric: tabular-nums; }
 
+/* ---- Inventory Status: lazy lot expander (quick operational lot view; Detail stays the full view) ---- */
+.inventory-result-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2) var(--sp-4); margin-bottom: var(--sp-2); }
+.inventory-result-bar .ds-result-meta { margin: 0; }
+.ds-btn-sm { height: 32px; line-height: 30px; padding: 0 var(--sp-3); font-size: .84rem; }
+.inventory-col-toggle { width: 6.5rem; text-align: right; white-space: nowrap; }
+.inventory-lot-toggle { display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--text-secondary); font-size: .82rem; font-weight: 500; cursor: pointer; transition: background var(--ease), border-color var(--ease), color var(--ease); }
+.inventory-lot-toggle:hover { color: var(--primary); border-color: var(--primary); background: var(--primary-soft); }
+.inventory-lot-toggle:disabled { opacity: .6; cursor: progress; }
+.inventory-lot-toggle[aria-expanded="true"] { color: var(--primary); border-color: var(--primary); background: var(--primary-soft); }
+.inventory-lot-toggle-icon { transition: transform var(--ease); }
+.inventory-lot-toggle[aria-expanded="true"] .inventory-lot-toggle-icon { transform: rotate(180deg); }
+.inventory-row--open td { border-bottom-color: transparent; }
+.inventory-table td.inventory-lot-panel-cell { padding: 0 var(--sp-4) var(--sp-3); background: var(--surface); }
+.inventory-lot-panel { background: var(--surface-soft); border: 1px solid var(--border); border-left: 3px solid var(--teal); border-radius: var(--radius); padding: var(--sp-3) var(--sp-4); font-size: .9rem; }
+.inventory-lot-panel--loading, .inventory-lot-panel--error { color: var(--text-secondary); }
+.inventory-lot-panel--error { border-left-color: var(--danger); color: var(--danger); }
+.inventory-lot-empty { margin: 0 0 var(--sp-2); color: var(--text-secondary); }
+
+/* desktop grid: ชื่อการค้า | Lot | หมดอายุ | จำนวน (แพ็ค × ขนาด) | ขนาดบรรจุ | รวมของล็อต */
+.inventory-lot-grid { display: grid; grid-template-columns: minmax(10rem, 1.6fr) minmax(6rem, .9fr) minmax(11rem, 1.3fr) minmax(8rem, 1fr) 6.5rem minmax(8rem, 1fr); column-gap: 0; }
+.inventory-lot-head, .inventory-lot-row, .inventory-lot-foot { display: contents; }
+.inventory-lot-head > span { font-size: .74rem; font-weight: 500; color: var(--text-tertiary); letter-spacing: .02em; padding: 0 var(--sp-3) var(--sp-1) var(--sp-2); border-bottom: 1px solid var(--border); }
+.inventory-lot-row > span { padding: var(--sp-2) var(--sp-3) var(--sp-2) var(--sp-2); border-bottom: 1px solid var(--border); align-self: stretch; display: flex; flex-wrap: wrap; align-items: center; gap: 2px var(--sp-1); }
+.inventory-lot-row > .inventory-lot-num { justify-content: flex-end; }
+.inventory-lot-num { text-align: right; font-variant-numeric: tabular-nums; }
+.inventory-lot-label { display: none; }
+.inventory-lot-name { font-weight: 500; color: var(--text-primary); }
+.inventory-lot-exp-date { font-variant-numeric: tabular-nums; }
+.inventory-lot-packs { font-size: 1.05rem; font-weight: 650; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.inventory-lot-ratio-value { font-size: 1.02rem; font-weight: 600; color: var(--text-primary); }
+.inventory-lot-total strong { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); }
+.inventory-lot-unit { font-size: .8rem; color: var(--text-secondary); }
+.inventory-lot-foot > span { padding: var(--sp-2) var(--sp-3) 0 var(--sp-2); }
+.inventory-lot-foot-label { grid-column: 1 / 4; font-weight: 600; text-align: right; }
+.inventory-lot-foot-total { grid-column: 4 / 7; text-align: right; font-variant-numeric: tabular-nums; }
+.inventory-lot-foot-total strong { font-size: 1.15rem; font-weight: 700; }
+.inventory-lot-foot-check { grid-column: 1 / 7; text-align: right; font-size: .82rem; padding-top: 2px; }
+.inventory-lot-check--ok { color: var(--text-tertiary); }
+.inventory-lot-check--warn { color: var(--warning); font-weight: 600; }
+.inventory-lot-detail-link { display: inline-block; margin-top: var(--sp-3); font-size: .82rem; color: var(--text-secondary); text-decoration: none; }
+.inventory-lot-detail-link:hover { color: var(--primary); text-decoration: underline; }
+
+/* expiry attention (owner rule: ≤ 3 months yellow, ≤ 1 month orange, expired strong red) — always with a text label */
+.inventory-exp-chip { display: inline-block; margin-left: var(--sp-1); padding: 2px 8px; border-radius: 999px; font-size: .76rem; font-weight: 700; line-height: 1.4; white-space: nowrap; }
+.inventory-lot-row.is-exp-3m > span { background: var(--exp-3m-soft); }
+.inventory-lot-row.is-exp-3m .inventory-exp-chip { background: var(--exp-3m); color: #3d2e00; }
+.inventory-lot-row.is-exp-1m > span { background: var(--exp-1m-soft); }
+.inventory-lot-row.is-exp-1m .inventory-exp-chip { background: var(--exp-1m); color: #fff; }
+.inventory-lot-row.is-expired > span { background: var(--exp-expired-soft); }
+.inventory-lot-row.is-expired .inventory-exp-chip { background: var(--exp-expired); color: #fff; }
+.inventory-lot-row.is-expired .inventory-lot-exp-date, .inventory-lot-row.is-expired .inventory-lot-name { color: var(--exp-expired); font-weight: 700; }
+.inventory-lot-row.is-exp-1m .inventory-lot-exp-date { color: #9a3e00; font-weight: 700; }
+.inventory-lot-row.is-exp-3m .inventory-lot-exp-date { color: #6b4f00; font-weight: 600; }
+
+@media (max-width: 767.98px) {
+  /* phone: icon-only toggle (text stays for assistive tech) so the drug name keeps its width */
+  .inventory-table:not(.inventory-table--compact) .inventory-col-toggle { width: 2.6rem; padding-left: 0; padding-right: var(--sp-2); }
+  .inventory-lot-toggle { width: 34px; height: 34px; padding: 0; justify-content: center; }
+  .inventory-lot-toggle-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .inventory-lot-toggle-icon { width: 18px; height: 18px; }
+  .inventory-table td.inventory-lot-panel-cell { padding: 0 var(--sp-2) var(--sp-2); }
+  .inventory-lot-panel { padding: var(--sp-2) var(--sp-3); }
+  .inventory-lot-grid { display: block; }
+  .inventory-lot-head { display: none; }
+  /* compact lot row: name | รวม ; Lot · หมดอายุ ; จำนวน · ขนาดบรรจุ */
+  .inventory-lot-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px var(--sp-3); padding: var(--sp-2) var(--sp-2); margin: 0 calc(-1 * var(--sp-2)); border-bottom: 1px solid var(--border); border-radius: var(--radius-sm); }
+  .inventory-lot-row > span { padding: 0; border-bottom: 0; align-self: auto; background: transparent !important; }
+  .inventory-lot-row.is-exp-3m { background: var(--exp-3m-soft); }
+  .inventory-lot-row.is-exp-1m { background: var(--exp-1m-soft); }
+  .inventory-lot-row.is-expired { background: var(--exp-expired-soft); }
+  .inventory-lot-name { grid-column: 1; grid-row: 1; }
+  .inventory-lot-total { grid-column: 2; grid-row: 1 / 3; text-align: right; align-self: center !important; }
+  .inventory-lot-no { grid-column: 1; grid-row: 2; font-size: .84rem; }
+  .inventory-lot-exp { grid-column: 1 / -1; grid-row: 3; font-size: .84rem; }
+  .inventory-lot-qty, .inventory-lot-ratio { grid-row: 4; text-align: left; font-size: .9rem; }
+  .inventory-lot-row > .inventory-lot-qty { grid-column: 1; justify-content: flex-start; }
+  .inventory-lot-row > .inventory-lot-ratio { grid-column: 2; justify-content: flex-end; text-align: right; }
+  .inventory-lot-label { display: inline; color: var(--text-tertiary); font-size: .78rem; }
+  .inventory-lot-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--sp-1) var(--sp-3); padding-top: var(--sp-2); }
+  .inventory-lot-foot > span { padding: 0; }
+  .inventory-lot-foot-check { flex-basis: 100%; text-align: left; }
+}
+
 @media (min-width: 1400px) {
   .inventory-table { font-size: .95rem; }
 }
@@ -433,9 +518,10 @@ a.metric-card:hover { border-color: var(--app-primary); box-shadow: 0 2px 8px rg
   .inventory-item-main { min-width: 0; }
   .inventory-item-meta span { white-space: normal; }
   .inventory-col-no { display: none; }
-  /* phone: fixed layout so name wraps and stock + coverage always stay on screen (no horizontal scroll for the primary list) */
-  .inventory-table:not(.inventory-table--compact) { table-layout: fixed; }
-  .inventory-table:not(.inventory-table--compact) .inventory-col-num { width: 4.6rem; }
+  /* phone: the name column wraps (meta spans wrap too) so stock + coverage always stay on screen; numeric columns are
+     narrow but never nowrap-forced wider than the viewport. (No table-layout: fixed — colspan panel rows + hidden columns
+     mis-distribute widths under fixed layout.) */
+  .inventory-table:not(.inventory-table--compact) .inventory-col-num { width: 4.2rem; }
   .inventory-item-name { overflow-wrap: anywhere; }
   .inventory-table th, .inventory-table td { padding: var(--sp-2) var(--sp-3); }
   .inventory-table thead th { white-space: normal; }
