@@ -154,7 +154,6 @@ a.metric-card:hover { border-color: var(--app-primary); box-shadow: 0 2px 8px rg
 .status-dot { display: inline-block; width: .6rem; height: .6rem; border-radius: 50%; vertical-align: middle; margin-right: .2rem; }
 .status-dot-ok { background: var(--app-success); }
 .status-dot-bad { background: var(--app-danger); }
-.reorder-badge { font-weight: 500; min-width: 7.5rem; }   /* print table */
 
 /* ---- Composition bar (ED / NED) ---- */
 .composition-bar { display: flex; height: .6rem; border-radius: .3rem; overflow: hidden; margin: .3rem 0; background: #eee; }
@@ -216,8 +215,6 @@ a.metric-card:hover { border-color: var(--app-primary); box-shadow: 0 2px 8px rg
 }
 
 /* ---- Module-specific column widths ---- */
-.print-body .reorder-table td:nth-child(3) { white-space: normal; min-width: 14rem; }
-.print-body .reorder-table td:nth-child(2) { white-space: nowrap; min-width: 0; }
 .po-table td.po-vendor { white-space: normal; min-width: 10rem; }
 .po-table td:nth-child(2) { white-space: nowrap; min-width: 0; }
 .po-lines td:nth-child(3) { white-space: normal; min-width: 10rem; }
@@ -228,68 +225,73 @@ a.metric-card:hover { border-color: var(--app-primary); box-shadow: 0 2px 8px rg
 .rc-lines td:nth-child(2) { white-space: nowrap; min-width: 0; }
 
 /* ==========================================================================
-   Reorder (คำแนะนำการสั่งซื้อ) — compact, table-first work page
+   Reorder (คำแนะนำการสั่งซื้อ) — operational work page on the shared design system.
+   Primary control = the status segmented control; table = shared .ds-table; rows stay neutral (no full-row tint).
    ========================================================================== */
-.reorder-header { margin-bottom: .6rem; }
-.reorder-header h1 { line-height: 1.25; }
 
-/* status strip: one row of pill links; current option = heavier border + weight + aria-current (never colour alone) */
-.reorder-status-strip { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .6rem; }
-.reorder-status-option {
-  display: inline-flex; align-items: center; gap: .4rem; padding: .3rem .7rem .3rem .55rem;
-  border: 1px solid var(--app-border); border-radius: 999px; background: var(--app-surface);
-  color: #333; text-decoration: none; font-size: .9rem; line-height: 1.3; white-space: nowrap;
-}
-.reorder-status-option:hover { border-color: #adb5bd; background: #f8f9fa; color: #111; }
-.reorder-status-option.is-active { border: 2px solid #343a40; padding: calc(.3rem - 1px) calc(.7rem - 1px) calc(.3rem - 1px) calc(.55rem - 1px); font-weight: 600; background: #f1f3f5; }
-.reorder-status-mark { width: .6rem; height: .6rem; border-radius: 50%; background: #adb5bd; flex: 0 0 auto; }
-.is-red .reorder-status-mark { background: var(--app-danger); }
-.is-yellow .reorder-status-mark { background: var(--app-warning); }
-.is-green .reorder-status-mark { background: var(--app-success); }
-.reorder-status-count {
-  font-variant-numeric: tabular-nums; font-size: .8rem; font-weight: 600; padding: .05rem .45rem;
-  border-radius: 999px; background: #e9ecef; color: #333;
-}
-.is-active .reorder-status-count { background: #343a40; color: #fff; }
+/* status segmented control (ONE primary selector) */
+.reorder-tabs { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-bottom: var(--sp-4); }
+.reorder-tab { display: inline-flex; align-items: center; gap: var(--sp-2); min-height: 40px; padding: 0 var(--sp-4) 0 var(--sp-3); border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text-secondary); text-decoration: none; font-size: .95rem; font-weight: 500; line-height: 1.3; transition: background var(--ease), border-color var(--ease), color var(--ease); }
+.reorder-tab:hover { border-color: var(--border-strong); background: var(--surface-soft); color: var(--text-primary); }
+.reorder-tab:focus-visible { outline: 3px solid var(--primary-ring); outline-offset: 2px; }
+.reorder-tab.is-active { border: 2px solid var(--primary); padding: 0 calc(var(--sp-4) - 1px) 0 calc(var(--sp-3) - 1px); background: var(--primary-soft); color: var(--primary); font-weight: 650; }
+.reorder-tab-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-tertiary); flex: 0 0 auto; }
+.reorder-tab.is-red .reorder-tab-dot { background: var(--danger); }
+.reorder-tab.is-yellow .reorder-tab-dot { background: #d9a32b; }
+.reorder-tab.is-green .reorder-tab-dot { background: var(--success); }
+.reorder-tab.is-all .reorder-tab-dot { background: var(--primary); }
+.reorder-tab-count { font-variant-numeric: tabular-nums; font-size: .82rem; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: var(--surface-soft); color: var(--text-secondary); border: 1px solid var(--border); }
+.reorder-tab.is-active .reorder-tab-count { background: var(--primary); border-color: var(--primary); color: #fff; }
 
-/* toolbar: search + actions on one line; wraps to two rows on phones */
-.reorder-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-bottom: .5rem; }
-.reorder-toolbar .form-control { flex: 1 1 14rem; max-width: 26rem; }
+/* toolbar: print action right-aligned */
 .reorder-toolbar .reorder-print { margin-left: auto; }
-@media (max-width: 575.98px) {
-  .reorder-toolbar .form-control { flex-basis: 100%; max-width: none; }
-  .reorder-toolbar .reorder-print { margin-left: 0; }
+
+/* context of the selected status */
+.reorder-context { margin-bottom: var(--sp-3); }
+.reorder-context-main { margin: 0; font-size: .95rem; color: var(--text-secondary); display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); align-items: baseline; }
+.reorder-context-main strong { color: var(--text-primary); font-weight: 650; }
+.reorder-context-total { padding-left: var(--sp-2); border-left: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+.reorder-context-warning { margin: var(--sp-1) 0 0; font-size: .84rem; color: var(--warning); }
+.reorder-context-warning::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--warning); margin-right: 6px; vertical-align: middle; }
+
+/* table specifics */
+.reorder-table .ds-item-main { min-width: 13rem; }
+.reorder-stock { font-weight: 650; color: var(--text-primary); font-size: 1rem; }
+.reorder-col-levels { width: 14.5rem; }
+.reorder-thresholds { display: flex; flex-wrap: wrap; gap: 2px var(--sp-3); margin: 0; font-size: .82rem; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.reorder-thresholds div { display: inline-flex; gap: 4px; align-items: baseline; }
+.reorder-thresholds dt { font-weight: 500; color: var(--text-tertiary); font-size: .74rem; letter-spacing: .03em; }
+.reorder-thresholds dd { margin: 0; color: var(--text-primary); font-weight: 500; }
+.reorder-table .reorder-levels--mobile, .reorder-table .reorder-status--mobile { display: none; }
+.reorder-col-suggested { width: 7.5rem; }
+.reorder-suggested { font-variant-numeric: tabular-nums; font-size: 1.02rem; font-weight: 600; color: var(--text-primary); }
+.reorder-suggested--attention { color: var(--danger); font-weight: 700; font-size: 1.08rem; }
+.reorder-suggested--none { color: var(--text-tertiary); font-weight: 400; font-size: .88rem; }
+.reorder-note { color: var(--warning); }
+/* attention = thin left accent only; rows stay white */
+.reorder-row.is-red > td:first-child { box-shadow: inset 3px 0 0 var(--danger); }
+.reorder-row.is-yellow > td:first-child { box-shadow: inset 3px 0 0 #d9a32b; }
+.reorder-col-status { width: 9rem; }
+.reorder-status-chip { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: .78rem; font-weight: 600; line-height: 1.5; border: 1px solid transparent; white-space: nowrap; }
+.reorder-status-chip.is-red { background: var(--danger-soft); color: var(--danger); border-color: #f0c9c9; }
+.reorder-status-chip.is-yellow { background: var(--warning-soft); color: var(--warning); border-color: #f1dfb8; }
+.reorder-status-chip.is-green { background: var(--success-soft); color: var(--success); border-color: #c6e5d3; }
+
+@media (max-width: 1199.98px) {
+  .reorder-col-levels { width: 9rem; }
+  .reorder-thresholds { flex-direction: column; gap: 0; }
 }
-
-/* result context line */
-.reorder-result-meta { margin: 0 0 .4rem; font-size: .9rem; }
-.reorder-result-note { color: var(--app-muted); font-size: .8rem; }
-
-/* table */
-.reorder-table-wrap { background: var(--app-surface); border: 1px solid var(--app-border); border-radius: .375rem; }
-.reorder-table { margin-bottom: 0; }
-.reorder-table td, .reorder-table th { white-space: normal; vertical-align: middle; }
-.reorder-table td.text-end, .reorder-table td.text-center { white-space: nowrap; }
-.reorder-table td.reorder-col-item, .reorder-table th.reorder-col-item { white-space: normal; min-width: 14rem; }
-.reorder-item-name { font-weight: 500; }
-.reorder-item-sub { display: block; font-size: .78rem; color: var(--app-muted); line-height: 1.3; }
-.reorder-note { color: var(--app-muted); }
-.reorder-suggested { font-variant-numeric: tabular-nums; }
-.reorder-suggested-attention { font-weight: 600; color: #7a1d1d; }
-.reorder-suggested-none { color: var(--app-muted); }
-.reorder-status { display: inline-block; font-size: .78rem; line-height: 1.2; padding: .15rem .5rem; border-radius: .25rem; border: 1px solid transparent; white-space: nowrap; }
-.reorder-status-red { color: #7a1d1d; background: #fdecec; border-color: #f2b8b8; font-weight: 600; }
-.reorder-status-yellow { color: #6b4e00; background: #fff5d6; border-color: #f2dd9b; }
-.reorder-status-green { color: #0f5132; background: #e6f4ec; border-color: #b9dfc9; }
-.reorder-row-attention td { background: #fff8f8; }
-.reorder-row-attention td:first-child { box-shadow: inset 3px 0 0 var(--app-danger); }
-.reorder-help { margin-top: .75rem; }
 @media (max-width: 767.98px) {
-  .reorder-table { font-size: .85rem; }
-  .reorder-table td.reorder-col-item, .reorder-table th.reorder-col-item { min-width: 8.5rem; }
-  .reorder-table td.reorder-col-status, .reorder-table th.reorder-col-status { white-space: normal; max-width: 5.6rem; }
-  .reorder-status { white-space: normal; line-height: 1.2; font-size: .72rem; padding: .15rem .35rem; }
-  .reorder-table td, .reorder-table th { padding-left: .3rem; padding-right: .3rem; }
+  .reorder-tabs { gap: var(--sp-1); }
+  .reorder-tab { flex: 1 1 calc(50% - var(--sp-1)); justify-content: center; min-height: 40px; padding: 0 var(--sp-2); font-size: .88rem; }
+  .reorder-tab.is-active { padding: 0 calc(var(--sp-2) - 1px); }
+  .reorder-toolbar .reorder-print { margin-left: 0; }
+  .reorder-col-levels, .reorder-col-status { display: none; }          /* thresholds fold under the name; status is in the context line / accent */
+  .reorder-table .reorder-levels--mobile { display: flex; }
+  .reorder-table .reorder-status--mobile { display: block; margin-top: 4px; }
+  .reorder-table .ds-item-main { min-width: 0; }
+  .reorder-col-suggested { width: 5rem; }
+  .reorder-stock { font-size: .98rem; }
 }
 
 /* ==========================================================================
@@ -386,32 +388,32 @@ a.metric-card:hover { border-color: var(--app-primary); box-shadow: 0 2px 8px rg
    Primary job: search → scan stock rows → open detail. Category breakdown is a collapsed disclosure below the list.
    Uses the generic .ds-page-* / .ds-summary / .ds-toolbar primitives (shared with Borrow); everything here is Inventory-specific.
    ========================================================================== */
-.inventory-code { font-variant-numeric: tabular-nums; letter-spacing: .03em; }
-.inventory-number { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.inventory-code, .ds-code { font-variant-numeric: tabular-nums; letter-spacing: .03em; }
+.inventory-number, .ds-number { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .inventory-number--strong { font-weight: 650; color: var(--text-primary); }
 .inventory-number--na { color: var(--text-tertiary); font-weight: 400; }
 .inventory-nowrap { white-space: nowrap; }
-.inventory-tabular { font-variant-numeric: tabular-nums; }
+.inventory-tabular, .ds-tabular { font-variant-numeric: tabular-nums; }
 
 /* operational table (single page scroll; .table-responsive only contains horizontal overflow of the dense table) */
-.inventory-list { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-1); }
-.inventory-table { width: 100%; margin: 0; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: .93rem; }
-.inventory-table th, .inventory-table td { padding: 9px var(--sp-4); border-bottom: 1px solid var(--border); vertical-align: middle; }
-.inventory-table thead th { font-size: .78rem; font-weight: 500; color: var(--text-tertiary); letter-spacing: .02em; text-align: left; background: var(--surface-subtle); }
-.inventory-table tbody tr:last-child td { border-bottom: 0; }
-.inventory-table tfoot td { background: var(--surface-subtle); font-weight: 600; border-top: 1px solid var(--border); border-bottom: 0; }
-.inventory-row { transition: background var(--ease); }
-.inventory-row:hover { background: var(--surface-soft); }
+.inventory-list, .ds-list { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-1); }
+.inventory-table, .ds-table { width: 100%; margin: 0; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: .93rem; }
+.inventory-table th, .inventory-table td, .ds-table th, .ds-table td { padding: 9px var(--sp-4); border-bottom: 1px solid var(--border); vertical-align: middle; }
+.inventory-table thead th, .ds-table thead th { font-size: .78rem; font-weight: 500; color: var(--text-tertiary); letter-spacing: .02em; text-align: left; background: var(--surface-subtle); }
+.inventory-table tbody tr:last-child td, .ds-table tbody tr:last-child td { border-bottom: 0; }
+.inventory-table tfoot td, .ds-table tfoot td { background: var(--surface-subtle); font-weight: 600; border-top: 1px solid var(--border); border-bottom: 0; }
+.inventory-row, .ds-row { transition: background var(--ease); }
+.inventory-row:hover, .ds-row:hover { background: var(--surface-soft); }
 .inventory-row--expired td { background: var(--danger-soft); }
-.inventory-col-no { width: 2.75rem; text-align: right; color: var(--text-tertiary); font-size: .82rem; }
-.inventory-col-num { text-align: right; }
-.inventory-item-main { min-width: 11rem; }
-.inventory-item-name { font-size: .98rem; font-weight: 600; line-height: 1.45; color: var(--text-primary); text-decoration: none; }
-.inventory-item-name:hover { color: var(--primary); text-decoration: underline; }
-.inventory-item-name:focus-visible { outline: 3px solid var(--primary-ring); outline-offset: 2px; border-radius: 3px; }
-.inventory-item-meta { display: flex; flex-wrap: wrap; gap: 2px var(--sp-2); margin-top: 2px; font-size: .8rem; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
-.inventory-item-meta span { white-space: normal; }
-.inventory-item-meta .dot::before { content: "·"; color: var(--text-tertiary); }
+.inventory-col-no, .ds-col-no { width: 2.75rem; text-align: right; color: var(--text-tertiary); font-size: .82rem; }
+.inventory-col-num, .ds-col-num { text-align: right; }
+.inventory-item-main, .ds-item-main { min-width: 11rem; }
+.inventory-item-name, .ds-item-name { font-size: .98rem; font-weight: 600; line-height: 1.45; color: var(--text-primary); text-decoration: none; }
+.inventory-item-name:hover, .ds-item-name:hover { color: var(--primary); text-decoration: underline; }
+.inventory-item-name:focus-visible, .ds-item-name:focus-visible { outline: 3px solid var(--primary-ring); outline-offset: 2px; border-radius: 3px; }
+.inventory-item-meta, .ds-item-meta { display: flex; flex-wrap: wrap; gap: 2px var(--sp-2); margin-top: 2px; font-size: .8rem; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.inventory-item-meta span, .ds-item-meta span { white-space: normal; }
+.inventory-item-meta .dot::before, .ds-item-meta .dot::before { content: "·"; color: var(--text-tertiary); }
 .inventory-item-meta--mobile { display: none; }
 .inventory-lot-name { font-weight: 500; }
 .inventory-table--compact { font-size: .88rem; }
@@ -524,20 +526,20 @@ a.metric-card:hover { border-color: var(--app-primary); box-shadow: 0 2px 8px rg
 }
 
 @media (min-width: 1400px) {
-  .inventory-table { font-size: .95rem; }
+  .inventory-table, .ds-table { font-size: .95rem; }
 }
 @media (max-width: 767.98px) {
-  .inventory-col-secondary { display: none; }
+  .inventory-col-secondary, .ds-col-secondary { display: none; }
   .inventory-item-meta--mobile { display: flex; }
-  .inventory-item-main { min-width: 0; }
-  .inventory-col-no { display: none; }
+  .inventory-item-main, .ds-item-main { min-width: 0; }
+  .inventory-col-no, .ds-col-no { display: none; }
   /* phone: the name column wraps (meta spans wrap too) so stock + coverage always stay on screen; numeric columns are
      narrow but never nowrap-forced wider than the viewport. (No table-layout: fixed — colspan panel rows + hidden columns
      mis-distribute widths under fixed layout.) */
-  .inventory-table:not(.inventory-table--compact) .inventory-col-num { width: 4.2rem; }
-  .inventory-item-name { overflow-wrap: anywhere; }
-  .inventory-table th, .inventory-table td { padding: var(--sp-2) var(--sp-3); }
-  .inventory-table thead th { white-space: normal; }
+  .inventory-table:not(.inventory-table--compact) .inventory-col-num, .ds-table:not(.inventory-table--compact) .ds-col-num { width: 4.2rem; }
+  .inventory-item-name, .ds-item-name { overflow-wrap: anywhere; }
+  .inventory-table th, .inventory-table td, .ds-table th, .ds-table td { padding: var(--sp-2) var(--sp-3); }
+  .inventory-table thead th, .ds-table thead th { white-space: normal; }
   .inventory-detail-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .inventory-kpi { padding: var(--sp-3) var(--sp-4); border-right: 0; border-bottom: 1px solid var(--border); }
   .inventory-kpi:nth-child(odd) { border-right: 1px solid var(--border); }

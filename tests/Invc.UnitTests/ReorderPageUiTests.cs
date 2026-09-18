@@ -66,71 +66,117 @@ public sealed class ReorderPageUiTests : IClassFixture<ReorderPageUiTests.Factor
     }
 
     [Fact]
-    public async Task Summary_card_grid_is_gone()
+    public async Task Legacy_card_grid_pills_and_bootstrap_table_are_gone()
     {
         var html = await GetAsync("/Reorder");
         Assert.DoesNotContain("inv-cards", html);
         Assert.DoesNotContain("reorder-card-active", html);
-        Assert.DoesNotContain("fs-4 fw-semibold", html);
+        Assert.DoesNotContain("reorder-status-option", html);
+        Assert.DoesNotContain("class=\"table ", html);
+        Assert.DoesNotContain("table-responsive", html);
+        Assert.DoesNotContain("form-control", html);
+        Assert.Contains("class=\"ds-page-title\">คำแนะนำการสั่งซื้อ</h1>", html);
+        Assert.DoesNotContain("Reorder Recommendations", html);
     }
 
     [Fact]
-    public async Task Status_strip_lists_every_status_with_its_count_and_marks_the_current_one()
+    public async Task Status_tabs_list_every_status_with_its_count_and_mark_the_current_one()
     {
         var html = await GetAsync("/Reorder?status=green");
-        var strip = Regex.Match(html, "<nav[^>]*class=\"[^\"]*reorder-status-strip[^\"]*\"[^>]*>(.*?)</nav>", RegexOptions.Singleline);
-        Assert.True(strip.Success, "one <nav class=\"reorder-status-strip\"> expected");
-        var options = Regex.Matches(strip.Groups[1].Value, "<a[^>]*class=\"[^\"]*reorder-status-option[^\"]*\"[^>]*>(.*?)</a>", RegexOptions.Singleline);
-        Assert.Equal(4, options.Count);
+        var nav = Regex.Match(html, "<nav[^>]*class=\"reorder-tabs\"[^>]*>(.*?)</nav>", RegexOptions.Singleline);
+        Assert.True(nav.Success, "one <nav class=\"reorder-tabs\"> expected");
+        var tabs = Regex.Matches(nav.Groups[1].Value, "<a[^>]*class=\"reorder-tab[^\"]*\"[^>]*>(.*?)</a>", RegexOptions.Singleline);
+        Assert.Equal(4, tabs.Count);
 
-        string Text(Match m) => Regex.Replace(m.Groups[1].Value, "<[^>]+>", " ");
-        Assert.Matches(@"ต้องสั่งซื้อทันที\s+2\b", Regex.Replace(Text(options[0]), @"\s+", " "));
-        Assert.Matches(@"ใกล้ถึงจุดสั่งซื้อ\s+1\b", Regex.Replace(Text(options[1]), @"\s+", " "));
-        Assert.Matches(@"มีสำรอง\s+3\b", Regex.Replace(Text(options[2]), @"\s+", " "));
-        Assert.Matches(@"ทั้งหมด\s+6\b", Regex.Replace(Text(options[3]), @"\s+", " "));
+        string Text(Match m) => Regex.Replace(Regex.Replace(m.Groups[1].Value, "<[^>]+>", " "), @"\s+", " ").Trim();
+        Assert.Equal("ต้องสั่งซื้อทันที 2", Text(tabs[0]));
+        Assert.Equal("ใกล้ถึงจุดสั่งซื้อ 1", Text(tabs[1]));
+        Assert.Equal("มีสำรอง 3", Text(tabs[2]));
+        Assert.Equal("ทั้งหมด 6", Text(tabs[3]));
 
-        // accessible current state on the selected option only
-        var current = options.Cast<Match>().Where(m => m.Value.Contains("aria-current=\"page\"")).ToList();
+        // accessible current state on the selected tab only (aria-current + is-active, never colour alone)
+        var current = tabs.Cast<Match>().Where(m => m.Value.Contains("aria-current=\"page\"")).ToList();
         Assert.Single(current);
         Assert.Contains("status=green", current[0].Value);
+        Assert.Contains("is-active", current[0].Value);
+        // no second selector for the same statuses
+        Assert.DoesNotContain("<select", html);
+    }
+
+    [Fact]
+    public async Task Specific_status_hides_the_per_row_status_column_and_all_shows_it()
+    {
+        var red = await GetAsync("/Reorder?status=red");
+        Assert.DoesNotContain("reorder-col-status", red);
+        Assert.DoesNotContain("reorder-status-chip", red);
+        Assert.Contains("ต้องสั่งซื้อทันที</strong> · 2 รายการ", Regex.Replace(red, @"\s+", " "));
+        Assert.Contains("แนะนำสั่งรวม", red);
+
+        var all = await GetAsync("/Reorder?status=all");
+        Assert.Contains("<th scope=\"col\" class=\"reorder-col-status\">สถานะ</th>", all);
+        Assert.Equal(6, Regex.Matches(all, "<td class=\"reorder-col-status\">").Count);
+        Assert.Contains("reorder-status-chip is-red", all);
+        Assert.Contains("reorder-status-chip is-green", all);
+        Assert.DoesNotContain("แนะนำสั่งรวม", all);
     }
 
     [Fact]
     public async Task Switching_status_preserves_the_search_keyword_and_search_preserves_the_status()
     {
         var html = await GetAsync("/Reorder?status=all&q=cap");
-        // status links keep q
-        var links = Regex.Matches(html, "<a[^>]*class=\"[^\"]*reorder-status-option[^\"]*\"[^>]*href=\"([^\"]+)\"");
+        var links = Regex.Matches(html, "<a[^>]*class=\"reorder-tab[^\"]*\"[^>]*href=\"([^\"]+)\"");
         Assert.Equal(4, links.Count);
         Assert.All(links.Cast<Match>(), m => Assert.Contains("q=cap", m.Groups[1].Value));
-        // search form keeps status via hidden field
-        var form = Regex.Match(html, "<form[^>]*class=\"[^\"]*reorder-toolbar[^\"]*\"[^>]*>(.*?)</form>", RegexOptions.Singleline);
-        Assert.True(form.Success, "one <form class=\"reorder-toolbar\"> expected");
+        var form = Regex.Match(html, "<form[^>]*class=\"ds-toolbar reorder-toolbar\"[^>]*>(.*?)</form>", RegexOptions.Singleline);
+        Assert.True(form.Success, "one <form class=\"ds-toolbar reorder-toolbar\"> expected");
         Assert.Contains("name=\"status\" value=\"all\"", form.Groups[1].Value.Replace("' ", "\" ").Replace("'", "\""));
-        Assert.Contains("placeholder=\"รหัสยา / ชื่อยา / ส่วนประกอบ\"", form.Groups[1].Value);
+        Assert.Contains("class=\"ds-input\"", form.Groups[1].Value);
+        Assert.Contains("placeholder=\"ค้นหารหัสยา / ชื่อยา / ส่วนประกอบ\"", form.Groups[1].Value);
+        Assert.Contains("ล้าง", form.Groups[1].Value);
     }
 
     [Fact]
-    public async Task Print_link_preserves_status_and_search()
+    public async Task Print_link_preserves_status_and_search_and_print_page_is_a_formal_report()
     {
         var html = await GetAsync("/Reorder?status=green&q=tab");
         var print = Regex.Match(html, "<a[^>]*href=\"(/Reorder/Print[^\"]*)\"[^>]*>");
         Assert.True(print.Success, "print link expected");
         Assert.Contains("status=green", print.Groups[1].Value);
         Assert.Contains("q=tab", print.Groups[1].Value);
+
+        var report = await GetAsync("/Reorder/Print?status=green&q=tab");
+        Assert.DoesNotContain("app-sidebar", report);
+        Assert.Contains("class=\"print-title\">รายงานคำแนะนำการสั่งซื้อ</h1>", report);
+        Assert.Contains("<dt>สถานะ</dt><dd><strong>มีสำรอง</strong></dd>", report);
+        Assert.Contains("<dt>ค้นหา</dt><dd>“tab”</dd>", report);
+        Assert.Contains("<dt>พิมพ์เมื่อ</dt>", report);
+        Assert.Contains("class=\"print-table reorder-print-table\"", report);
+        Assert.Contains("<th scope=\"col\" class=\"num\">MIN</th>", report);
+        Assert.Contains("<th scope=\"col\" class=\"num\">จุดสั่งซื้อ</th>", report);
+        Assert.Contains("<th scope=\"col\" class=\"num\">MAX</th>", report);
+        Assert.Contains("มีสำรอง</td>", report);                    // status as text, readable without colour
+        Assert.DoesNotContain("badge", report);
     }
 
     [Fact]
-    public async Task Result_table_is_present_with_status_text_and_suggested_quantity()
+    public async Task Result_table_keeps_thresholds_suggested_quantity_and_a_to_z_order()
     {
-        var html = await GetAsync("/Reorder");   // default = red
-        Assert.Contains("class=\"table", html);
-        Assert.Contains("reorder-table", html);
-        Assert.Contains("ต้องสั่งซื้อทันที", html);      // status communicated as text, never colour only
-        Assert.Contains("reorder-suggested", html);       // suggested quantity has its own hook
-        Assert.Contains("1000130", html);
-        Assert.Contains("Clindamycin 300 mg cap", html);
-        Assert.DoesNotContain("SqlException", html);
+        var html = await GetAsync("/Reorder?status=all");
+        Assert.Contains("class=\"ds-table reorder-table\"", html);
+        Assert.Contains("class=\"ds-list reorder-list\"", html);
+        // ระดับคลัง cell keeps every threshold value
+        Assert.Contains("<dt>MIN</dt><dd>33</dd>", html);
+        Assert.Contains("<dt>จุดสั่งซื้อ</dt><dd>33</dd>", html);
+        Assert.Contains("<dt>MAX</dt><dd>50</dd>", html);
+        Assert.Contains("<dt>จุดสั่งซื้อ</dt><dd>150</dd>", html);      // yellow item ROP ≠ MIN
+        // suggested quantity: red rows strong, green non-positive shown as text
+        Assert.Contains("reorder-suggested reorder-suggested--attention\">50</span>", html);
+        Assert.Contains("reorder-suggested--none", html);
+        Assert.Contains("ไม่ต้องสั่ง", html);
+        // owner rule: A–Z by name (not WORKING_CODE order)
+        var names = Regex.Matches(html, "class=\"ds-item-name\"[^>]*>([^<]+)<").Cast<Match>().Select(m => m.Groups[1].Value).ToArray();
+        Assert.Equal(["Acyclovir 400 mg tab", "Albendazole 200 mg tab", "Clindamycin 300 mg cap", "Gabapentin 300 mg cap", "Yellow test item", "ซอง sterile 6 นิ้ว"], names);
+        Assert.Contains("href=\"/Inventory/Detail/1000130\"", html);
     }
 
     [Fact]
@@ -138,6 +184,25 @@ public sealed class ReorderPageUiTests : IClassFixture<ReorderPageUiTests.Factor
     {
         var html = await GetAsync("/Reorder?status=all");
         Assert.Contains("ยังไม่กำหนด MIN/MAX", html);
-        Assert.DoesNotContain("ไม่ได้กำหนด MIN/MAX</span>", html);   // old badge markup gone
+        Assert.DoesNotContain("ไม่ได้กำหนด MIN/MAX</span>", html);
+        Assert.Contains("class=\"reorder-context-warning\">ยังไม่กำหนด MIN 2 รายการ · MAX 2 รายการ</p>", html);
+    }
+
+    [Fact]
+    public void Reorder_css_has_no_inner_scroll_and_no_full_row_tint()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "Invc.slnx"))) dir = dir.Parent;
+        var css = File.ReadAllText(Path.Combine(dir!.FullName, "src", "Invc.Web", "wwwroot", "css", "site.css"));
+        var start = css.IndexOf("Reorder (คำแนะนำการสั่งซื้อ)", StringComparison.Ordinal);
+        var end = css.IndexOf("Borrow (", start, StringComparison.Ordinal);
+        var block = css[start..end];
+        Assert.DoesNotContain("max-height", block);
+        Assert.DoesNotContain("overflow: auto", block);
+        Assert.DoesNotContain("overflow-y", block);
+        Assert.DoesNotContain("overflow-x", block);
+        Assert.DoesNotContain("reorder-row-attention td { background", block);   // old full-row pink tint
+        Assert.DoesNotMatch(@"\.reorder-row\.is-red(\s*>\s*td)?\s*\{[^}]*background", block);
+        Assert.Contains("box-shadow: inset 3px 0 0 var(--danger)", block);       // thin accent only
     }
 }

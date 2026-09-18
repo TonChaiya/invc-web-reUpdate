@@ -17,20 +17,20 @@
     <link rel="stylesheet" href="~/css/print.css" asp-append-version="true" />
 </head>
 <body class="print-body">
-    <div class="no-print d-flex gap-2 align-items-center mb-3">
-        <button type="button" class="btn btn-primary" onclick="window.print()">พิมพ์ / บันทึกเป็น PDF</button>
-        <a class="btn btn-outline-secondary" asp-page="/Reorder/Index" asp-route-status="@Model.Filter.ToQueryValue()" asp-route-q="@Model.Keyword">กลับหน้าคำแนะนำการสั่งซื้อ</a>
-        <span class="text-muted small">ใช้คำสั่งพิมพ์ของเบราว์เซอร์ (Ctrl+P) เพื่อบันทึกเป็น PDF</span>
+    <div class="no-print print-actions">
+        <button type="button" class="ds-btn ds-btn-primary" onclick="window.print()">พิมพ์ / บันทึกเป็น PDF</button>
+        <a class="ds-btn ds-btn-secondary" asp-page="/Reorder/Index" asp-route-status="@Model.Filter.ToQueryValue()" asp-route-q="@Model.Keyword">กลับหน้าคำแนะนำการสั่งซื้อ</a>
+        <span class="print-hint">ใช้คำสั่งพิมพ์ของเบราว์เซอร์ (Ctrl+P) เพื่อบันทึกเป็น PDF · กระดาษ A4</span>
     </div>
 
     <header class="print-header">
-        <h1 class="h4 mb-1">รายงานคำแนะนำการสั่งซื้อ (Reorder Recommendations)</h1>
-        <div class="print-meta">
-            <span>สถานะ: <strong>@Model.Filter.ThaiLabel()</strong></span>
-            @if (Model.Keyword is not null) { <span>· ค้นหา: “@Model.Keyword”</span> }
-            <span>· คลังเวชภัณฑ์หลัก</span>
-            <span>· พิมพ์เมื่อ @Model.GeneratedAt.ToString("d MMMM yyyy HH:mm")</span>
-        </div>
+        <div class="print-org">INVC · คลังเวชภัณฑ์หลัก</div>
+        <h1 class="print-title">รายงานคำแนะนำการสั่งซื้อ</h1>
+        <dl class="print-meta">
+            <div><dt>สถานะ</dt><dd><strong>@Model.Filter.ThaiLabel()</strong></dd></div>
+            @if (Model.Keyword is not null) { <div><dt>ค้นหา</dt><dd>“@Model.Keyword”</dd></div> }
+            <div><dt>พิมพ์เมื่อ</dt><dd>@Model.GeneratedAt.ToString("d MMMM yyyy HH:mm")</dd></div>
+        </dl>
     </header>
 
     @if (Model.HasError)
@@ -39,23 +39,28 @@
     }
     else if (Model.Report is { } r)
     {
-        <p class="print-meta mb-2">
-            รายการที่เข้าเกณฑ์ทั้งหมด @r.EligibleCount.ToString("N0") ·
-            ต้องสั่งซื้อทันที @r.RedCount.ToString("N0") ·
-            ใกล้ถึงจุดสั่งซื้อ @r.YellowCount.ToString("N0") ·
-            มีสำรอง @r.GreenCount.ToString("N0") ·
-            แสดง <strong>@r.Rows.Count.ToString("N0")</strong> รายการ
-        </p>
+        <dl class="print-totals">
+            <div><dt>รายการที่เข้าเกณฑ์</dt><dd>@r.EligibleCount.ToString("N0")</dd></div>
+            <div><dt>ต้องสั่งซื้อทันที</dt><dd>@r.RedCount.ToString("N0")</dd></div>
+            <div><dt>ใกล้ถึงจุดสั่งซื้อ</dt><dd>@r.YellowCount.ToString("N0")</dd></div>
+            <div><dt>มีสำรอง</dt><dd>@r.GreenCount.ToString("N0")</dd></div>
+            <div><dt>แสดงในรายงานนี้</dt><dd><strong>@r.Rows.Count.ToString("N0")</strong></dd></div>
+            @if (Model.Filter == ReorderStatusFilter.Red && r.RedSuggestedTotal > 0)
+            {
+                <div><dt>แนะนำสั่งรวม</dt><dd><strong>@r.RedSuggestedTotal.ToString("N0")</strong> หน่วย</dd></div>
+            }
+        </dl>
         @if (r.Rows.Count == 0)
         {
-            <p class="text-center text-muted">ไม่มีรายการตามสถานะที่เลือก</p>
+            <p class="print-empty">ไม่มีรายการตามสถานะที่เลือก</p>
         }
         else
         {
             <partial name="_ReorderPrintTable" model="r" />
         }
-        <footer class="print-footer text-muted small">
-            เกณฑ์: ต้องสั่งซื้อทันที = คงคลัง &lt; MIN · ใกล้ถึงจุดสั่งซื้อ = MIN ≤ คงคลัง &lt; จุดสั่งซื้อ · มีสำรอง = กรณีอื่น · แนะนำสั่ง = ปัดขึ้น(MAX − คงคลัง)
+        <footer class="print-footer">
+            เกณฑ์: ต้องสั่งซื้อทันที = คงคลัง &lt; MIN · ใกล้ถึงจุดสั่งซื้อ = MIN ≤ คงคลัง &lt; จุดสั่งซื้อ · มีสำรอง = กรณีอื่น · แนะนำสั่ง = ปัดขึ้น(MAX − คงคลัง) ·
+            เป็นคำแนะนำจากข้อมูล INV (อ่านอย่างเดียว) ไม่ใช่ใบสั่งซื้อจริง
         </footer>
     }
 </body>

@@ -2,27 +2,27 @@
 @using Invc.Core.Reorder
 @model ReorderReport
 @*
-    Screen table for /Reorder (table-first). Column hierarchy:
-      1: drug + code · unit, stock, suggested order, status
-      2: MIN / reorder point / MAX   (own columns from md up; folded into the name sub-line below md)
-      3: rate per month, months of stock (lg up only)
-    Attention rows (RED) get a thin left accent + light tint; status is always text.
+    Screen table for /Reorder on the shared operational table (ds-table).
+    Columns: รายการยา · คงคลัง · ระดับคลัง (MIN / จุดสั่งซื้อ / MAX in one cell) · แนะนำสั่ง · อัตราใช้/เดือน · เหลือใช้ · สถานะ (only when filter = ทั้งหมด —
+    a specific status is already stated once by the selector/context, so per-row chips would repeat it).
+    Rows stay neutral; attention is a thin left accent + the suggested quantity, never a full-row tint.
 *@
-<div class="table-responsive reorder-table-wrap">
-    <table class="table table-sm table-hover align-middle inv-table reorder-table">
+@{
+    var showStatus = Model.Filter == ReorderStatusFilter.All;
+}
+<div class="ds-list reorder-list">
+    <table class="ds-table reorder-table">
         <caption class="visually-hidden">คำแนะนำการสั่งซื้อ สถานะ @Model.Filter.ThaiLabel()</caption>
-        <thead class="table-light">
+        <thead>
             <tr>
-                <th scope="col" class="text-end inv-col-no">#</th>
-                <th scope="col" class="reorder-col-item">รายการยา</th>
-                <th scope="col" class="text-end">คงคลัง</th>
-                <th scope="col" class="text-end d-none d-md-table-cell">MIN</th>
-                <th scope="col" class="text-end d-none d-md-table-cell">จุดสั่งซื้อ</th>
-                <th scope="col" class="text-end d-none d-md-table-cell">MAX</th>
-                <th scope="col" class="text-end">แนะนำสั่ง</th>
-                <th scope="col" class="reorder-col-status">สถานะ</th>
-                <th scope="col" class="text-end d-none d-lg-table-cell">อัตราใช้/เดือน</th>
-                <th scope="col" class="text-end d-none d-lg-table-cell">เหลือใช้ (เดือน)</th>
+                <th scope="col" class="ds-col-no">#</th>
+                <th scope="col">รายการยา</th>
+                <th scope="col" class="ds-col-num">คงคลัง</th>
+                <th scope="col" class="reorder-col-levels">ระดับคลัง</th>
+                <th scope="col" class="ds-col-num reorder-col-suggested">แนะนำสั่ง</th>
+                <th scope="col" class="ds-col-num ds-col-secondary">อัตราใช้/เดือน</th>
+                <th scope="col" class="ds-col-num ds-col-secondary">เหลือใช้ (เดือน)</th>
+                @if (showStatus) { <th scope="col" class="reorder-col-status">สถานะ</th> }
             </tr>
         </thead>
         <tbody>
@@ -30,42 +30,61 @@
         @foreach (var item in Model.Rows)
         {
             n++;
-            var isRed = item.Status == ReorderStatus.Red;
-            var statusClass = item.Status switch
+            var tone = item.Status switch
             {
-                ReorderStatus.Red => "reorder-status-red",
-                ReorderStatus.Yellow => "reorder-status-yellow",
-                _ => "reorder-status-green",
+                ReorderStatus.Red => "is-red",
+                ReorderStatus.Yellow => "is-yellow",
+                _ => "is-green",
             };
+            var isRed = item.Status == ReorderStatus.Red;
             var suggested = item.DisplaySuggestedQty();
             var min = (item.MinLevel ?? 0m).ToString("N0");
             var rop = item.EffectiveReorderPoint.ToString("N0");
             var max = (item.MaxLevel ?? 0m).ToString("N0");
-            <tr class="@(isRed ? "reorder-row-attention" : null)">
-                <td class="text-end text-muted">@n</td>
-                <td class="reorder-col-item">
-                    <a class="reorder-item-name" asp-page="/Inventory/Detail" asp-route-workingCode="@item.WorkingCode">@item.DrugName</a>
-                    <span class="reorder-item-sub">
-                        <span class="inv-code">@item.WorkingCode</span>@(string.IsNullOrEmpty(item.SaleUnit) ? "" : $" · {item.SaleUnit}")<span class="d-md-none"> · MIN @min / ROP @rop / MAX @max</span>@if (item.HasNoThresholds) { <span class="reorder-note" title="MIN_LEVEL และ MAX_LEVEL เป็น 0 หรือว่าง — ตั้งค่าในโปรแกรม Access"> · ยังไม่กำหนด MIN/MAX</span> }
-                    </span>
+            <tr class="ds-row reorder-row @tone">
+                <td class="ds-col-no">@n</td>
+                <td class="ds-item-main reorder-item">
+                    <a class="ds-item-name" asp-page="/Inventory/Detail" asp-route-workingCode="@item.WorkingCode">@item.DrugName</a>
+                    <div class="ds-item-meta">
+                        <span class="ds-code">@item.WorkingCode</span>
+                        @if (!string.IsNullOrEmpty(item.SaleUnit)) { <span class="dot"></span><span>@item.SaleUnit</span> }
+                        @if (!string.IsNullOrEmpty(item.Location)) { <span class="dot"></span><span>@item.Location</span> }
+                        @if (item.HasNoThresholds) { <span class="dot"></span><span class="reorder-note" title="MIN_LEVEL และ MAX_LEVEL เป็น 0 หรือว่าง — ตั้งค่าในโปรแกรม Access">ยังไม่กำหนด MIN/MAX</span> }
+                    </div>
+                    <div class="ds-item-meta reorder-levels--mobile">
+                        <span>MIN @min</span><span class="dot"></span><span>ROP @rop</span><span class="dot"></span><span>MAX @max</span>
+                        @if (item.RatePerMonth is not null) { <span class="dot"></span><span>ใช้ @item.RatePerMonth.Value.ToString("N0")/เดือน</span> }
+                        <span class="dot"></span><span>เหลือใช้ @item.MonthsOfStockDisplay เดือน</span>
+                    </div>
+                    @if (showStatus)
+                    {
+                        <div class="reorder-status--mobile"><span class="reorder-status-chip @tone">@item.Status.ThaiLabel()</span></div>
+                    }
                 </td>
-                <td class="text-end">@((item.QtyOnHand ?? 0m).ToString("N0"))</td>
-                <td class="text-end d-none d-md-table-cell">@min</td>
-                <td class="text-end d-none d-md-table-cell">@rop</td>
-                <td class="text-end d-none d-md-table-cell">@max</td>
-                <td class="text-end">
+                <td class="ds-col-num ds-number reorder-stock">@((item.QtyOnHand ?? 0m).ToString("N0"))</td>
+                <td class="reorder-col-levels">
+                    <dl class="reorder-thresholds">
+                        <div><dt>MIN</dt><dd>@min</dd></div>
+                        <div><dt>จุดสั่งซื้อ</dt><dd>@rop</dd></div>
+                        <div><dt>MAX</dt><dd>@max</dd></div>
+                    </dl>
+                </td>
+                <td class="ds-col-num ds-number reorder-col-suggested">
                     @if (suggested <= 0m && !isRed)
                     {
-                        <span class="reorder-suggested reorder-suggested-none" title="ค่าดิบตามสูตร: @item.SuggestedOrderQty.ToString("N0")">ไม่ต้องสั่ง</span>
+                        <span class="reorder-suggested reorder-suggested--none" title="ค่าดิบตามสูตร: @item.SuggestedOrderQty.ToString("N0")">ไม่ต้องสั่ง</span>
                     }
                     else
                     {
-                        <span class="reorder-suggested @(isRed ? "reorder-suggested-attention" : "")">@suggested.ToString("N0")</span>
+                        <span class="reorder-suggested @(isRed ? "reorder-suggested--attention" : "")">@suggested.ToString("N0")</span>
                     }
                 </td>
-                <td class="reorder-col-status"><span class="reorder-status @statusClass">@item.Status.ThaiLabel()</span></td>
-                <td class="text-end d-none d-lg-table-cell">@(item.RatePerMonth?.ToString("N0"))</td>
-                <td class="text-end d-none d-lg-table-cell">@item.MonthsOfStockDisplay</td>
+                <td class="ds-col-num ds-number ds-col-secondary">@(item.RatePerMonth?.ToString("N0") ?? "–")</td>
+                <td class="ds-col-num ds-number ds-col-secondary @(item.RatePerMonth is null or 0m ? "inventory-number--na" : "")">@item.MonthsOfStockDisplay</td>
+                @if (showStatus)
+                {
+                    <td class="reorder-col-status"><span class="reorder-status-chip @tone">@item.Status.ThaiLabel()</span></td>
+                }
             </tr>
         }
         </tbody>

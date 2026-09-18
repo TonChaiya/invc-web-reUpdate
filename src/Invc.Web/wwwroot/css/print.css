@@ -16,3 +16,29 @@
   a { color: inherit; text-decoration: none; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* ---- Formal report layout (Reorder print; other print pages may adopt it when migrated) ---- */
+.print-body { font-family: "Segoe UI", Tahoma, "Leelawadee UI", sans-serif; max-width: 1100px; margin: 0 auto; }
+.print-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
+.print-hint { color: #555; font-size: 12px; }
+.print-org { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: #444; }
+.print-title { font-size: 18px; font-weight: 700; margin: 2px 0 6px; color: #000; }
+dl.print-meta, dl.print-totals { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 0; }
+dl.print-meta div, dl.print-totals div { display: inline-flex; gap: 6px; align-items: baseline; }
+dl.print-meta dt, dl.print-totals dt { color: #555; font-weight: 400; }
+dl.print-meta dd, dl.print-totals dd { margin: 0; color: #000; font-variant-numeric: tabular-nums; }
+dl.print-totals { padding: 6px 0 8px; border-bottom: 1px solid #999; margin-bottom: 8px; font-size: 12px; }
+.print-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.print-table th, .print-table td { border: 1px solid #999; padding: 3px 5px; vertical-align: middle; white-space: normal; }
+.print-table thead th { background: #eee !important; font-weight: 600; text-align: left; }
+.print-table th.num, .print-table td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.print-table td.code { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.print-table .muted { color: #666; }
+.print-table .strong { font-weight: 700; }
+.print-table td.status { white-space: nowrap; }
+.print-empty { text-align: center; color: #555; padding: 16px 0; }
+@media print {
+  .print-body { max-width: none; }
+  .print-table { font-size: 10px; }
+  .print-table th, .print-table td { border-color: #000; }
+}
