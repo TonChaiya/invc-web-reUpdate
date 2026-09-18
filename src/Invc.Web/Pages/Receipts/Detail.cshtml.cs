@@ -23,6 +23,11 @@ public class DetailModel(INonPoReceiptRepository receipts, ILogger<DetailModel> 
         try
         {
             Receipt = await receipts.GetDetailAsync(ReceiveNo!, cancellationToken);
+            if (Receipt is not null)
+            {
+                // owner rule: item lists A–Z by drug name
+                Receipt = Receipt with { Lines = Invc.Core.Inventory.DrugNameOrder.Sort(Receipt.Lines, l => l.DrugName, l => l.WorkingCode) };
+            }
         }
         catch (Exception ex)
         {

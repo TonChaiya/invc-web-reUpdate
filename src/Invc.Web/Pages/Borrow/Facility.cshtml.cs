@@ -45,7 +45,9 @@ public class FacilityModel(BorrowSyncService sync, IBorrowMirrorRepository mirro
 
         try
         {
-            AllBills = await mirror.GetBillsAsync(FacilityCode, cancellationToken);
+            AllBills = (await mirror.GetBillsAsync(FacilityCode, cancellationToken))
+                .Select(b => b with { Items = Invc.Core.Inventory.DrugNameOrder.Sort(b.Items, i => i.DrugName, i => i.WorkingCode) })
+                .ToList();   // owner rule: item lists A–Z by drug name
             Bills = Filter(AllBills, Keyword);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

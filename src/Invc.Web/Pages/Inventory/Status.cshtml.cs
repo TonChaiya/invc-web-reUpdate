@@ -88,7 +88,7 @@ public class StatusModel(IInventoryRepository inventory, ILogger<StatusModel> lo
         {
             Summary = await inventory.GetSummaryAsync(cancellationToken);
             Locations = await inventory.GetLocationsAsync(cancellationToken);
-            Items = await inventory.GetStatusAsync(Keyword, Location, cancellationToken);
+            Items = DrugNameOrder.Sort(await inventory.GetStatusAsync(Keyword, Location, cancellationToken), i => i.DrugName, i => i.WorkingCode);
         }
         catch (Exception ex)
         {

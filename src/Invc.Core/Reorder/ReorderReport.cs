@@ -17,7 +17,7 @@ public sealed class ReorderReport
         RedCount = eligible.Count(i => i.Status == ReorderStatus.Red);
         YellowCount = eligible.Count(i => i.Status == ReorderStatus.Yellow);
         GreenCount = eligible.Count(i => i.Status == ReorderStatus.Green);
-        Rows = eligible.Where(i => filter.Matches(i.Status)).ToList();
+        Rows = DrugNameOrder.Sort(eligible.Where(i => filter.Matches(i.Status)), i => i.DrugName, i => i.WorkingCode);
         RedSuggestedTotal = eligible.Where(i => i.Status == ReorderStatus.Red).Sum(i => i.SuggestedOrderQty);
     }
 

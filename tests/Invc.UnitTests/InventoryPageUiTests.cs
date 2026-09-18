@@ -35,8 +35,8 @@ public sealed class InventoryPageUiTests : IClassFixture<InventoryPageUiTests.Fa
     {
         public IReadOnlyList<InventoryItem> Items { get; } =
         [
-            new() { WorkingCode = "1000123", DrugName = "AMOXICILLIN 500 MG CAP", HospCode = "AMX500", Ven = "E", QtyOnHand = 12_500, SaleUnit = "แคปซูล", Location = "A01", RatePerMonth = 2_500, BorrowableQty = 6_250 },
             new() { WorkingCode = "1000456", DrugName = "PARACETAMOL 500 MG TAB", Ven = "E", QtyOnHand = 80_000, SaleUnit = "เม็ด", Location = "A02", RatePerMonth = null, BorrowableQty = 0 },
+            new() { WorkingCode = "1000123", DrugName = "AMOXICILLIN 500 MG CAP", HospCode = "AMX500", Ven = "E", QtyOnHand = 12_500, SaleUnit = "แคปซูล", Location = "A01", RatePerMonth = 2_500, BorrowableQty = 6_250 },
             new() { WorkingCode = "3000860", DrugName = "ซอง sterile 6 นิ้ว", Ven = "N", QtyOnHand = 30, SaleUnit = "ซอง", Location = "S1", RatePerMonth = 10, BorrowableQty = 15 },
         ];
 
@@ -144,6 +144,8 @@ public sealed class InventoryPageUiTests : IClassFixture<InventoryPageUiTests.Fa
         var (_, html) = await GetAsync("/Inventory/Status");
         var rows = Regex.Matches(html, "<tr class=\"inventory-row\">(.*?)</tr>", RegexOptions.Singleline);
         Assert.Equal(3, rows.Count);
+        // owner rule: A–Z by drug name although the repository returned PARACETAMOL first
+        Assert.Equal(["1000123", "1000456", "3000860"], rows.Cast<Match>().Select(m => Regex.Match(m.Groups[1].Value, "/Inventory/Detail/(\\w+)").Groups[1].Value).ToArray());
         var first = rows[0].Groups[1].Value;
         Assert.Contains("href=\"/Inventory/Detail/1000123\"", first);
         Assert.Contains("class=\"inventory-item-name\"", first);

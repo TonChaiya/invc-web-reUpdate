@@ -58,6 +58,18 @@ public class InventoryRulesTests
     public void ClassifyExpiry_uses_owner_thresholds_expired_1_month_3_months(string? exp, ExpiryStatus expected)
         => Assert.Equal(expected, InventoryRules.ClassifyExpiry(exp is null ? null : DateTime.Parse(exp, System.Globalization.CultureInfo.InvariantCulture), new DateTime(2026, 9, 18, 14, 30, 0)));
 
+    [Fact]
+    public void DrugNameOrder_sorts_case_insensitively_latin_then_thai_with_blank_names_last_and_code_tiebreak()
+    {
+        var items = new[]
+        {
+            ("2000001", "ยาน้ำแก้ไอ"), ("1000030", "amoxicillin 500 mg tab"), ("1000010", "Acyclovir 400 mg tab"),
+            ("1000020", (string?)null), ("1000011", "Acyclovir 400 mg tab"), ("3000860", "ซอง sterile 6 นิ้ว"),
+        };
+        var sorted = DrugNameOrder.Sort(items, i => i.Item2, i => i.Item1).Select(i => i.Item1).ToArray();
+        Assert.Equal(["1000010", "1000011", "1000030", "3000860", "2000001", "1000020"], sorted);
+    }
+
     // Quick lot view: each lot keeps its own PACK_RATIO (never merged across lots).
     [Theory]
     [InlineData(200, 100, "2 × 100")]

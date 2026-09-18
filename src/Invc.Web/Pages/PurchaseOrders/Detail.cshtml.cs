@@ -24,6 +24,11 @@ public class DetailModel(IPurchaseOrderRepository purchaseOrders, ILogger<Detail
         try
         {
             Order = await purchaseOrders.GetDetailAsync(RealPo!, cancellationToken);
+            if (Order is not null)
+            {
+                // owner rule: item lists A–Z by drug name (document totals are order-independent)
+                Order = Order with { Lines = Invc.Core.Inventory.DrugNameOrder.Sort(Order.Lines, l => l.DrugName, l => l.WorkingCode) };
+            }
         }
         catch (Exception ex)
         {
