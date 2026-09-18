@@ -5,27 +5,33 @@
     ViewData["HideNavSearch"] = true;
 }
 
-<nav aria-label="breadcrumb">
-    <ol class="breadcrumb mb-2">
-        <li class="breadcrumb-item"><a asp-page="/PurchaseOrders/Index" asp-route-fy="@Model.Order?.Header.FiscalYear">ใบสั่งซื้อ</a></li>
-        <li class="breadcrumb-item active" aria-current="page">@Model.RealPo</li>
-    </ol>
-</nav>
+<div class="po-page po-detail ds-page">
+    <nav class="ds-breadcrumb" aria-label="breadcrumb">
+        <a asp-page="/PurchaseOrders/Index" asp-route-fy="@Model.Order?.Header.FiscalYear">ใบสั่งซื้อ</a> <span aria-hidden="true">/</span> <span>@Model.RealPo</span>
+    </nav>
 
-@if (Model.HasError)
-{
-    <div class="alert alert-danger" role="alert">
-        ไม่สามารถอ่านข้อมูลใบสั่งซื้อจากฐานข้อมูล INV ได้ กรุณาตรวจสอบหน้า <a asp-page="/Health" class="alert-link">สถานะระบบ</a>
-    </div>
-}
-else if (Model.Order is { } order)
-{
-    <div class="page-header d-flex flex-wrap align-items-start justify-content-between gap-2">
-        <div>
-            <h1 class="h3 mb-0">ใบสั่งซื้อ <span class="inv-code">@order.Header.DisplayNumber</span></h1>
-            <p class="text-muted mb-0">@(order.Header.VendorName ?? "ไม่พบชื่อบริษัท") · @(order.Header.PoDate?.ToString("d MMMM yyyy"))</p>
+    @if (Model.HasError)
+    {
+        <div class="alert alert-danger" role="alert">
+            ไม่สามารถอ่านข้อมูลใบสั่งซื้อจากฐานข้อมูล INV ได้ กรุณาตรวจสอบหน้า <a asp-page="/Health" class="alert-link">สถานะระบบ</a>
         </div>
-        <a class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener" asp-page="/PurchaseOrders/Print" asp-route-realPo="@order.Header.DisplayNumber">พิมพ์ / บันทึกเป็น PDF</a>
-    </div>
-    <partial name="_PurchaseOrderBody" model="order" />
-}
+    }
+    else if (Model.Order is { } order)
+    {
+        var h = order.Header;
+        <div class="ds-page-header po-detail-header">
+            <div>
+                <h1 class="ds-page-title po-number">@h.DisplayNumber</h1>
+                <p class="po-detail-vendor">@(h.VendorName ?? "ไม่พบชื่อบริษัท")<span class="po-detail-date">@(h.PoDate?.ToString("d MMMM yyyy") ?? "ไม่ระบุวันที่")</span></p>
+                <p class="ds-identity po-identity">
+                    <span>เลขเอกสาร @(string.IsNullOrWhiteSpace(h.DocNo) ? "–" : h.DocNo)</span>
+                    <span class="dot"></span><span>@(h.BuyMethodName ?? h.BuyMethod ?? "–")</span>
+                    <span class="dot"></span><span>@(h.BudgetName ?? h.BudgetType ?? "–")</span>
+                    <span class="dot"></span><span>@(h.EdNedName ?? h.EdNed ?? "–")</span>
+                </p>
+            </div>
+            <a class="ds-btn ds-btn-secondary" target="_blank" rel="noopener" asp-page="/PurchaseOrders/Print" asp-route-realPo="@h.DisplayNumber">พิมพ์ / บันทึก PDF</a>
+        </div>
+        <partial name="_PurchaseOrderBody" model="order" view-data="@(new ViewDataDictionary(ViewData) { ["Today"] = Model.Today })" />
+    }
+</div>
