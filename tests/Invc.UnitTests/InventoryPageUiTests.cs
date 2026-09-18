@@ -41,11 +41,19 @@ public sealed class InventoryPageUiTests : IClassFixture<InventoryPageUiTests.Fa
         ];
 
         public Task<IReadOnlyList<InventoryItem>> GetStatusAsync(string? keyword, CancellationToken cancellationToken = default)
+            => GetStatusAsync(keyword, null, cancellationToken);
+
+        public Task<IReadOnlyList<InventoryItem>> GetStatusAsync(string? keyword, string? location, CancellationToken cancellationToken = default)
         {
-            IReadOnlyList<InventoryItem> r = keyword is null ? Items
-                : Items.Where(i => i.DrugName.Contains(keyword, StringComparison.OrdinalIgnoreCase) || i.WorkingCode.Contains(keyword)).ToList();
+            IReadOnlyList<InventoryItem> r = Items
+                .Where(i => keyword is null || i.DrugName.Contains(keyword, StringComparison.OrdinalIgnoreCase) || i.WorkingCode.Contains(keyword))
+                .Where(i => location is null || i.Location == location)
+                .ToList();
             return Task.FromResult(r);
         }
+
+        public Task<IReadOnlyList<string>> GetLocationsAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<string>>(["A01", "A02", "S1"]);
 
         public Task<InventorySummary> GetSummaryAsync(CancellationToken cancellationToken = default)
             => Task.FromResult(InventorySummary.FromGroups(
@@ -71,13 +79,13 @@ public sealed class InventoryPageUiTests : IClassFixture<InventoryPageUiTests.Fa
         }
 
         public int StatusLotsCalls;
-        public Task<IReadOnlyList<InventoryLot>> GetStatusLotsAsync(string? keyword, CancellationToken cancellationToken = default)
+        public Task<IReadOnlyList<InventoryLot>> GetStatusLotsAsync(string? keyword, string? location, CancellationToken cancellationToken = default)
         {
             StatusLotsCalls++;
             var detail = GetDetailAsync("1000123").Result!;
-            IReadOnlyList<InventoryLot> lots = keyword is not null && !"AMOXICILLIN 500 MG CAP".Contains(keyword, StringComparison.OrdinalIgnoreCase) && !"1000123".Contains(keyword)
-                ? []
-                : detail.Lots.Select(l => l with { WorkingCode = "1000123" }).ToList();
+            var excluded = (keyword is not null && !"AMOXICILLIN 500 MG CAP".Contains(keyword, StringComparison.OrdinalIgnoreCase) && !"1000123".Contains(keyword))
+                           || (location is not null && location != "A01");
+            IReadOnlyList<InventoryLot> lots = excluded ? [] : detail.Lots.Select(l => l with { WorkingCode = "1000123" }).ToList();
             return Task.FromResult(lots);
         }
 
@@ -250,7 +258,7 @@ public sealed class InventoryPageUiTests : IClassFixture<InventoryPageUiTests.Fa
     {
         var (_, html) = await GetAsync("/Inventory/Status?q=amox");
         Assert.Contains("id=\"inventory-lots-all\"", html);
-        Assert.Matches("id=\"inventory-lots-all\"\\s+data-q=\"amox\" aria-pressed=\"false\" hidden>", html);
+        Assert.Matches("id=\"inventory-lots-all\"\\s+data-q=\"amox\" data-loc=\"\" aria-pressed=\"false\" hidden>", html);
         Assert.Contains("แสดงล็อตทั้งหมด", html);
     }
 
@@ -260,6 +268,43 @@ public sealed class InventoryPageUiTests : IClassFixture<InventoryPageUiTests.Fa
         Assert.Equal(HttpStatusCode.NotFound, (await GetAsync("/Inventory/Status?handler=Lots&workingCode=1000123x!")).Code);
         Assert.Equal(HttpStatusCode.NotFound, (await GetAsync("/Inventory/Status?handler=Lots&workingCode=")).Code);
         Assert.Equal(HttpStatusCode.NotFound, (await GetAsync("/Inventory/Status?handler=Lots&workingCode=9999999")).Code);
+    }
+
+    [Fact]
+    public async Task Status_location_dropdown_is_the_single_category_control_and_filters_the_list()
+    {
+        var (_, html) = await GetAsync("/Inventory/Status");
+        // one <select> with "ทุกที่เก็บ" + the distinct locations; no permanent per-location table/cards anywhere
+        Assert.Single(Regex.Matches(html, "<select class=\"ds-select\" id=\"loc\" name=\"loc\""));
+        Assert.Contains("<option value=\"\">ทุกที่เก็บ</option>", html);
+        Assert.Contains("<option value=\"A01\">A01</option>", html);
+        Assert.Contains("<option value=\"S1\">S1</option>", html);
+        Assert.DoesNotContain("สรุปตามที่เก็บ", html);
+
+        var (code, filtered) = await GetAsync("/Inventory/Status?loc=A01");
+        Assert.Equal(HttpStatusCode.OK, code);
+        Assert.Contains("<option value=\"A01\" selected=\"selected\">A01</option>", filtered);
+        Assert.Single(Regex.Matches(filtered, "<tr class=\"inventory-row\">"));
+        Assert.Contains("href=\"/Inventory/Detail/1000123\"", filtered);
+        var text = Text(filtered);
+        // compact summary of the selected context replaces the store-wide strip; result line names the context
+        Assert.Contains("ที่เก็บ A01", text);
+        Assert.Contains("1 รายการ 12,500 หน่วย", text);
+        Assert.DoesNotContain("มูลค่า 1,245,782.50", text);
+        Assert.Contains("แสดง 1 รายการ · ที่เก็บ “A01”", text);
+        Assert.Contains("href=\"/Inventory/Status\"", filtered);            // ล้าง
+        Assert.Contains("data-loc=\"A01\"", filtered);                      // show-all lots stays scoped
+
+        // keyword + location combine; unknown location → empty state with a way back
+        Assert.Single(Regex.Matches((await GetAsync("/Inventory/Status?loc=A01&q=amox")).Html, "<tr class=\"inventory-row\">"));
+        var (_, none) = await GetAsync("/Inventory/Status?loc=ZZ");
+        Assert.Contains("ไม่พบรายการ ในที่เก็บ “ZZ”", Text(none));
+
+        // AllLots honours the location
+        var (_, lots) = await GetAsync("/Inventory/Status?handler=AllLots&loc=A02");
+        Assert.Single(Regex.Matches(lots, "<div data-lots-for=\"\\w+\">"));
+        Assert.Contains("data-lots-for=\"1000456\"", lots);
+        Assert.Contains("ไม่มีข้อมูลล็อตสำหรับรายการนี้", lots);
     }
 
     [Fact]
@@ -279,6 +324,8 @@ public sealed class InventoryPageUiTests : IClassFixture<InventoryPageUiTests.Fa
         Assert.DoesNotContain("max-height: calc(100vh", block);
         Assert.DoesNotContain("overflow: auto", block);
         Assert.DoesNotContain("overflow-y", block);
+        // owner rule: the page already has a scrollbar — no element may scroll on its own (Bootstrap's wrapper is neutralised)
+        Assert.Contains(".table-responsive { overflow: visible !important; }", css);
         // the legacy wrappers used by other modules no longer cap height either
         Assert.DoesNotContain(".inv-table-wrap { max-height: calc", css);
         Assert.DoesNotContain(".reorder-table-wrap { max-height: calc", css);

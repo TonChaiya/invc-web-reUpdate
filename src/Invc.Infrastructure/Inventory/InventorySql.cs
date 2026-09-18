@@ -88,6 +88,29 @@ internal static class InventorySql
         """;
 
     /// <summary>
+    /// Location filter (owner request 2026-09-18): the Status list and its lot view can be narrowed to one INV_MD.LOCATION.
+    /// Appended to the WHERE clause before ORDER BY so the legacy predicates above stay byte-identical when no location is given.
+    /// </summary>
+    private const string LocationPredicate = "  AND m.LOCATION = @Location\n";
+
+    internal static string WithLocation(string statement)
+    {
+        var i = statement.LastIndexOf("ORDER BY", StringComparison.Ordinal);
+        return statement[..i] + LocationPredicate + statement[i..];
+    }
+
+    public static readonly string StatusAllByLocation = WithLocation(StatusAll);
+    public static readonly string StatusSearchByLocation = WithLocation(StatusSearch);
+
+    /// <summary>Distinct storage locations of active items for the dropdown (one small SELECT).</summary>
+    public const string Locations = """
+        SELECT DISTINCT RTRIM(m.LOCATION) AS Location
+        FROM dbo.INV_MD m
+        WHERE m.NOUSE IS NULL AND m.LOCATION IS NOT NULL AND RTRIM(m.LOCATION) <> ''
+        ORDER BY RTRIM(m.LOCATION)
+        """;
+
+    /// <summary>
     /// Quick lot view for the Status page: all INV_MD_C lots of the active (optionally keyword-filtered) items in one
     /// statement — same predicate as <see cref="StatusAll"/>/<see cref="StatusSearch"/>, lot columns as in
     /// <see cref="DetailLots"/> minus vendor/manufacturer (not part of the quick view). Trade name via OUTER APPLY TOP 1
@@ -125,6 +148,9 @@ internal static class InventorySql
                OR m.WORKING_CODE LIKE @Pattern)
         ORDER BY c.WORKING_CODE, c.EXPIRED_DATE, c.LOTNO, c.RECORD_NUMBER
         """;
+
+    public static readonly string StatusLotsAllByLocation = WithLocation(StatusLotsAll);
+    public static readonly string StatusLotsSearchByLocation = WithLocation(StatusLotsSearch);
 
     /// <summary>
     /// Active items (NOUSE IS NULL) grouped by ED/NED class. The page derives its headline totals by summing

@@ -84,8 +84,8 @@
     function loadAll() {
         allButton.disabled = true;
         allText.textContent = ALL_LOADING;
-        var q = allButton.getAttribute('data-q') || '';
-        return fetch(basePath + '?handler=AllLots&q=' + encodeURIComponent(q), { headers: { 'Accept': 'text/html' }, credentials: 'same-origin' })
+        var q = allButton.getAttribute('data-q') || '', loc = allButton.getAttribute('data-loc') || '';
+        return fetch(basePath + '?handler=AllLots&q=' + encodeURIComponent(q) + '&loc=' + encodeURIComponent(loc), { headers: { 'Accept': 'text/html' }, credentials: 'same-origin' })
             .then(function (r) { if (!r.ok) { throw new Error('HTTP ' + r.status); } return r.text(); })
             .then(function (html) {
                 var doc = new DOMParser().parseFromString(html, 'text/html');

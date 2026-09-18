@@ -15,11 +15,18 @@ public class StatusModel(IInventoryRepository inventory, ILogger<StatusModel> lo
     [BindProperty(SupportsGet = true, Name = "q")]
     public string? Keyword { get; set; }
 
+    /// <summary>Selected storage location (INV_MD.LOCATION) — the single category control of this page (owner request 2026-09-18).</summary>
+    [BindProperty(SupportsGet = true, Name = "loc")]
+    public string? Location { get; set; }
+
+    public IReadOnlyList<string> Locations { get; private set; } = [];
     public IReadOnlyList<InventoryItem> Items { get; private set; } = [];
     public InventorySummary? Summary { get; private set; }
     public bool HasError { get; private set; }
 
-    public bool IsFiltered => Keyword is not null;
+    public bool IsFiltered => Keyword is not null || Location is not null;
+    /// <summary>Compact summary of the selected context: count and quantity of the shown items (value is only known for the whole store).</summary>
+    public decimal ShownQty => Items.Sum(i => i.QtyOnHand);
 
     /// <summary>
     /// Lazy lot panel for one medicine (GET /Inventory/Status?handler=Lots&amp;workingCode=…): rendered only when the
@@ -53,13 +60,14 @@ public class StatusModel(IInventoryRepository inventory, ILogger<StatusModel> lo
     /// same keyword — two SELECTs in total (items + all their lots), never one per item. Items without lots get an
     /// empty panel so every row can expand.
     /// </summary>
-    public async Task<IActionResult> OnGetAllLotsAsync(string? q, CancellationToken cancellationToken)
+    public async Task<IActionResult> OnGetAllLotsAsync(string? q, string? loc, CancellationToken cancellationToken)
     {
         var keyword = SearchKeyword.Normalize(q);
+        var location = Invc.Infrastructure.Inventory.InventoryRepository.NormalizeLocation(loc);
         try
         {
-            var items = await inventory.GetStatusAsync(keyword, cancellationToken);
-            var lots = await inventory.GetStatusLotsAsync(keyword, cancellationToken);
+            var items = await inventory.GetStatusAsync(keyword, location, cancellationToken);
+            var lots = await inventory.GetStatusLotsAsync(keyword, location, cancellationToken);
             var byCode = lots.GroupBy(l => l.WorkingCode).ToDictionary(g => g.Key, g => (IReadOnlyList<InventoryLot>)g.ToList());
             var panels = items.Select(i => LotPanelModel.From(i, byCode.TryGetValue(i.WorkingCode, out var l) ? l : [])).ToList();
             return Partial("_LotPanels", panels);
@@ -74,11 +82,13 @@ public class StatusModel(IInventoryRepository inventory, ILogger<StatusModel> lo
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
         Keyword = SearchKeyword.Normalize(Keyword);
+        Location = Invc.Infrastructure.Inventory.InventoryRepository.NormalizeLocation(Location);
 
         try
         {
             Summary = await inventory.GetSummaryAsync(cancellationToken);
-            Items = await inventory.GetStatusAsync(Keyword, cancellationToken);
+            Locations = await inventory.GetLocationsAsync(cancellationToken);
+            Items = await inventory.GetStatusAsync(Keyword, Location, cancellationToken);
         }
         catch (Exception ex)
         {

@@ -10,30 +10,50 @@ public sealed class InventoryRepository(ISqlConnectionFactory connections) : IIn
     /// <summary>INV_MD.WORKING_CODE is nvarchar(7).</summary>
     public const int WorkingCodeMaxLength = 7;
 
-    public async Task<IReadOnlyList<InventoryItem>> GetStatusAsync(string? keyword, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<InventoryItem>> GetStatusAsync(string? keyword, CancellationToken cancellationToken = default)
+        => GetStatusAsync(keyword, null, cancellationToken);
+
+    public async Task<IReadOnlyList<InventoryItem>> GetStatusAsync(string? keyword, string? location, CancellationToken cancellationToken = default)
     {
         var normalized = SearchKeyword.Normalize(keyword);
+        var loc = NormalizeLocation(location);
         await using var connection = await connections.OpenAsync(cancellationToken).ConfigureAwait(false);
-
-        CommandDefinition command;
-        if (normalized is null)
+        var sql = (normalized, loc) switch
         {
-            command = new CommandDefinition(
-                ReadOnlySql.Ensure(InventorySql.StatusAll),
-                commandTimeout: connections.CommandTimeoutSeconds,
-                cancellationToken: cancellationToken);
-        }
-        else
-        {
-            command = new CommandDefinition(
-                ReadOnlySql.Ensure(InventorySql.StatusSearch),
-                new { Pattern = LikePattern(normalized) },
-                commandTimeout: connections.CommandTimeoutSeconds,
-                cancellationToken: cancellationToken);
-        }
-
+            (null, null) => InventorySql.StatusAll,
+            (null, _) => InventorySql.StatusAllByLocation,
+            (_, null) => InventorySql.StatusSearch,
+            _ => InventorySql.StatusSearchByLocation,
+        };
+        var command = new CommandDefinition(ReadOnlySql.Ensure(sql), StatusParameters(normalized, loc),
+            commandTimeout: connections.CommandTimeoutSeconds, cancellationToken: cancellationToken);
         var rows = await connection.QueryAsync<InventoryItem>(command).ConfigureAwait(false);
         return rows.AsList();
+    }
+
+    public async Task<IReadOnlyList<string>> GetLocationsAsync(CancellationToken cancellationToken = default)
+    {
+        await using var connection = await connections.OpenAsync(cancellationToken).ConfigureAwait(false);
+        var rows = await connection.QueryAsync<string>(new CommandDefinition(ReadOnlySql.Ensure(InventorySql.Locations),
+            commandTimeout: connections.CommandTimeoutSeconds, cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return rows.AsList();
+    }
+
+    /// <summary>INV_MD.LOCATION is nvarchar(50) in production; the dropdown value is matched exactly after trimming.</summary>
+    public const int LocationMaxLength = 50;
+
+    public static string? NormalizeLocation(string? location)
+    {
+        var v = location?.Trim();
+        return string.IsNullOrEmpty(v) || v.Length > LocationMaxLength ? null : v;
+    }
+
+    private static DynamicParameters StatusParameters(string? normalizedKeyword, string? location)
+    {
+        var p = new DynamicParameters();
+        if (normalizedKeyword is not null) p.Add("Pattern", LikePattern(normalizedKeyword));
+        if (location is not null) p.Add("Location", new DbString { Value = location, IsAnsi = false, Length = LocationMaxLength });
+        return p;
     }
 
     public async Task<InventorySummary> GetSummaryAsync(CancellationToken cancellationToken = default)
@@ -91,15 +111,20 @@ public sealed class InventoryRepository(ISqlConnectionFactory connections) : IIn
         };
     }
 
-    public async Task<IReadOnlyList<InventoryLot>> GetStatusLotsAsync(string? keyword, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<InventoryLot>> GetStatusLotsAsync(string? keyword, string? location, CancellationToken cancellationToken = default)
     {
         var normalized = SearchKeyword.Normalize(keyword);
+        var loc = NormalizeLocation(location);
         await using var connection = await connections.OpenAsync(cancellationToken).ConfigureAwait(false);
-        var command = normalized is null
-            ? new CommandDefinition(ReadOnlySql.Ensure(InventorySql.StatusLotsAll),
-                commandTimeout: connections.CommandTimeoutSeconds, cancellationToken: cancellationToken)
-            : new CommandDefinition(ReadOnlySql.Ensure(InventorySql.StatusLotsSearch), new { Pattern = LikePattern(normalized) },
-                commandTimeout: connections.CommandTimeoutSeconds, cancellationToken: cancellationToken);
+        var sql = (normalized, loc) switch
+        {
+            (null, null) => InventorySql.StatusLotsAll,
+            (null, _) => InventorySql.StatusLotsAllByLocation,
+            (_, null) => InventorySql.StatusLotsSearch,
+            _ => InventorySql.StatusLotsSearchByLocation,
+        };
+        var command = new CommandDefinition(ReadOnlySql.Ensure(sql), StatusParameters(normalized, loc),
+            commandTimeout: connections.CommandTimeoutSeconds, cancellationToken: cancellationToken);
         var rows = await connection.QueryAsync<InventoryLot>(command).ConfigureAwait(false);
         return rows.AsList();
     }

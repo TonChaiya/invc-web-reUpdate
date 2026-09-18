@@ -23,6 +23,14 @@
     else
     {
         <form method="get" class="ds-toolbar inventory-toolbar" role="search" aria-label="ค้นหารายการยา">
+            <label class="visually-hidden" for="loc">ที่เก็บ</label>
+            <select class="ds-select" id="loc" name="loc" aria-label="กรองตามที่เก็บ">
+                <option value="">ทุกที่เก็บ</option>
+                @foreach (var l in Model.Locations)
+                {
+                    <option value="@l" selected="@(l == Model.Location)">@l</option>
+                }
+            </select>
             <label class="visually-hidden" for="q">ค้นหา</label>
             <input class="ds-input" type="search" id="q" name="q" value="@Model.Keyword"
                    maxlength="@Invc.Core.Inventory.SearchKeyword.MaxLength" autocomplete="off"
@@ -34,7 +42,16 @@
             }
         </form>
 
-        @if (Model.Summary is { } s)
+        @if (Model.Location is not null)
+        {
+            @* selected context only (owner rule: one concept = one primary control) *@
+            <div class="ds-summary inventory-summary" role="group" aria-label="สรุปที่เก็บที่เลือก">
+                <span class="ds-stat">ที่เก็บ <strong>@Model.Location</strong></span>
+                <span class="ds-stat"><strong>@Model.Items.Count.ToString("N0")</strong> รายการ</span>
+                <span class="ds-stat"><strong>@Model.ShownQty.ToString("N0")</strong> หน่วย</span>
+            </div>
+        }
+        else if (Model.Summary is { } s)
         {
             <div class="ds-summary inventory-summary" role="group" aria-label="สรุปคลังเวชภัณฑ์หลัก">
                 <span class="ds-stat"><strong>@s.ActiveItemCount.ToString("N0")</strong> รายการ</span>
@@ -46,12 +63,13 @@
         <div class="inventory-result-bar">
             <p class="ds-result-meta inventory-result-meta" aria-live="polite">
                 แสดง @Model.Items.Count.ToString("N0") รายการ
-                @if (Model.IsFiltered) { <text>· ค้นหา “@Model.Keyword”</text> }
+                @if (Model.Location is not null) { <text>· ที่เก็บ “@Model.Location”</text> }
+                @if (Model.Keyword is not null) { <text>· ค้นหา “@Model.Keyword”</text> }
             </p>
             @if (Model.Items.Count > 0)
             {
                 <button type="button" class="ds-btn ds-btn-secondary ds-btn-sm" id="inventory-lots-all"
-                        data-q="@Model.Keyword" aria-pressed="false" hidden>
+                        data-q="@Model.Keyword" data-loc="@Model.Location" aria-pressed="false" hidden>
                     <span class="inventory-lots-all-text">แสดงล็อตทั้งหมด</span>
                 </button>
             }
@@ -62,7 +80,7 @@
             <div class="ds-empty" role="status">
                 @if (Model.IsFiltered)
                 {
-                    <text>ไม่พบรายการที่ตรงกับ “@Model.Keyword” — <a asp-page="/Inventory/Status">แสดงทั้งหมด</a></text>
+                    <text>ไม่พบรายการ@(Model.Keyword is null ? "" : $"ที่ตรงกับ “{Model.Keyword}”")@(Model.Location is null ? "" : $" ในที่เก็บ “{Model.Location}”") — <a asp-page="/Inventory/Status">แสดงทั้งหมด</a></text>
                 }
                 else
                 {

@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Invc.Core.Inventory;
 using Invc.Infrastructure.Data;
 using Invc.Infrastructure.Inventory;
@@ -190,6 +191,23 @@ public class Phase2SqlGuardTests
             Assert.DoesNotContain("SELECT *", sql, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain(".*", sql, StringComparison.Ordinal);
         }
+    }
+
+    [Fact]
+    public void Location_variants_append_one_predicate_before_order_by_and_leave_the_legacy_statement_intact()
+    {
+        var type = typeof(InventoryRepository).Assembly.GetType("Invc.Infrastructure.Inventory.InventorySql")!;
+        string F(string n) => (string)type.GetField(n)!.GetValue(null)!;
+        foreach (var (plain, byLoc) in new[] { ("StatusAll", "StatusAllByLocation"), ("StatusSearch", "StatusSearchByLocation"), ("StatusLotsAll", "StatusLotsAllByLocation"), ("StatusLotsSearch", "StatusLotsSearchByLocation") })
+        {
+            var a = F(plain); var b = F(byLoc);
+            Assert.Equal(a, ReadOnlySql.Ensure(a));
+            Assert.Equal(b, ReadOnlySql.Ensure(b));
+            Assert.Equal(a.Replace("  AND m.LOCATION = @Location\n", ""), b.Replace("  AND m.LOCATION = @Location\n", ""));
+            Assert.Single(Regex.Matches(b, "AND m.LOCATION = @Location"));
+            Assert.True(b.IndexOf("AND m.LOCATION", StringComparison.Ordinal) < b.LastIndexOf("ORDER BY", StringComparison.Ordinal));
+        }
+        Assert.DoesNotContain("= @Location", F("StatusAll"));
     }
 
     [Fact]

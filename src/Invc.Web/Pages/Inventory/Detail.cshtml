@@ -114,11 +114,11 @@
                                 <th scope="col">ชื่อการค้า / เลขที่ผลิต</th>
                                 <th scope="col">วันหมดอายุ</th>
                                 <th scope="col" class="inventory-col-num">คงเหลือ (@item.SaleUnit)</th>
-                                <th scope="col" class="inventory-col-num">แพ็ค</th>
-                                <th scope="col" class="inventory-col-num">ขนาดบรรจุ</th>
-                                <th scope="col" class="inventory-col-num">มูลค่า (บาท)</th>
-                                <th scope="col">ที่เก็บ</th>
-                                <th scope="col">ผู้จำหน่าย / ผู้ผลิต</th>
+                                <th scope="col" class="inventory-col-num inventory-col-secondary">แพ็ค</th>
+                                <th scope="col" class="inventory-col-num inventory-col-secondary">ขนาดบรรจุ</th>
+                                <th scope="col" class="inventory-col-num inventory-col-secondary">มูลค่า (บาท)</th>
+                                <th scope="col" class="inventory-col-secondary">ที่เก็บ</th>
+                                <th scope="col" class="inventory-col-secondary">ผู้จำหน่าย / ผู้ผลิต</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -138,11 +138,11 @@
                                     @if (expired) { <span class="status-chip status-chip-danger">หมดอายุ</span> }
                                 </td>
                                 <td class="inventory-col-num inventory-number inventory-number--strong">@lot.QtyOnHand.ToString("N0")</td>
-                                <td class="inventory-col-num inventory-number">@(lot.Packs?.ToString("N2") ?? "–")</td>
-                                <td class="inventory-col-num inventory-number">@lot.PackRatio.ToString("N0")</td>
-                                <td class="inventory-col-num inventory-number">@(lot.LotValue?.ToString("N2") ?? "–")</td>
-                                <td>@(lot.Location ?? "–")</td>
-                                <td class="inventory-item-main">
+                                <td class="inventory-col-num inventory-number inventory-col-secondary">@(lot.Packs?.ToString("N2") ?? "–")</td>
+                                <td class="inventory-col-num inventory-number inventory-col-secondary">@lot.PackRatio.ToString("N0")</td>
+                                <td class="inventory-col-num inventory-number inventory-col-secondary">@(lot.LotValue?.ToString("N2") ?? "–")</td>
+                                <td class="inventory-col-secondary">@(lot.Location ?? "–")</td>
+                                <td class="inventory-item-main inventory-col-secondary">
                                     <span>@(lot.VendorName ?? lot.VendorCode ?? "–")</span>
                                     <div class="inventory-item-meta"><span>@(lot.ManufacName ?? lot.ManufacCode ?? "–")</span></div>
                                 </td>

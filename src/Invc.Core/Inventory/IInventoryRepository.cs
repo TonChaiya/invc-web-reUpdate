@@ -14,6 +14,12 @@ public interface IInventoryRepository
     /// </summary>
     Task<IReadOnlyList<InventoryItem>> GetStatusAsync(string? keyword, CancellationToken cancellationToken = default);
 
+    /// <summary>Status list narrowed to one storage location (INV_MD.LOCATION, exact match) in addition to the keyword.</summary>
+    Task<IReadOnlyList<InventoryItem>> GetStatusAsync(string? keyword, string? location, CancellationToken cancellationToken = default);
+
+    /// <summary>Distinct non-empty INV_MD.LOCATION values of active items, sorted — the "ที่เก็บ" dropdown of the Status page.</summary>
+    Task<IReadOnlyList<string>> GetLocationsAsync(CancellationToken cancellationToken = default);
+
     /// <summary>Headline totals for the active inventory (NOUSE IS NULL): count, quantity, value.</summary>
     Task<InventorySummary> GetSummaryAsync(CancellationToken cancellationToken = default);
 
@@ -24,7 +30,7 @@ public interface IInventoryRepository
     /// Every INV_MD_C lot of the items the Status list shows (same active/keyword filter), ordered by item then expiry —
     /// one SELECT for the "show all lots" action of the Status page. Never used during the list render itself.
     /// </summary>
-    Task<IReadOnlyList<InventoryLot>> GetStatusLotsAsync(string? keyword, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<InventoryLot>> GetStatusLotsAsync(string? keyword, string? location, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Set-based header-vs-lot reconciliation over active items (parity check A10):
