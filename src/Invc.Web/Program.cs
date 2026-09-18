@@ -1,10 +1,13 @@
-using System.Globalization;
+﻿using System.Globalization;
 using Invc.Infrastructure;
 using Invc.Infrastructure.Data;
 using Invc.Web;
 using Microsoft.AspNetCore.Localization;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Developer-local, untracked overrides (git-ignored: appsettings.*.local.json) — e.g. the application MySQL connection string.
+builder.Configuration.AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.local.json", optional: true, reloadOnChange: false);
 
 // Fail fast on invalid deployment configuration (shape only — never opens a database connection, so a
 // temporary database outage cannot stop the application from starting).
@@ -21,6 +24,9 @@ if (configProblems.Count > 0)
 // Read-only data access to the production INV database. There is deliberately no
 // EF Core, no migrations and no database initialisation anywhere in this application.
 builder.Services.AddInvcReadOnlyData(builder.Configuration);
+// Application-owned MySQL database (invc_web) — the Borrow module's writable mirror. Schema comes from db/mysql via
+// scripts/mysql-migrate.ps1, never from startup. SQL Server INV stays SELECT-only.
+builder.Services.AddInvcAppData(builder.Configuration);
 builder.Services.AddRazorPages();
 
 var app = builder.Build();

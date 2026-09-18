@@ -1,4 +1,4 @@
-using Invc.Core.Diagnostics;
+﻿using Invc.Core.Diagnostics;
 using Invc.Core.Inventory;
 using Invc.Infrastructure.Data;
 using Invc.Infrastructure.Diagnostics;
@@ -11,6 +11,9 @@ using Invc.Core.Receipts;
 using Invc.Infrastructure.Receipts;
 using Invc.Core.Dashboard;
 using Invc.Infrastructure.Dashboard;
+using Invc.Core.Borrow;
+using Invc.Infrastructure.AppData;
+using Invc.Infrastructure.Borrow;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -33,6 +36,20 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IDashboardAnalyticsRepository, DashboardAnalyticsRepository>();
         services.AddScoped<DashboardService>();
         services.AddScoped<IDatabaseHealth, DatabaseHealth>();
+        services.AddScoped<IBorrowSourceRepository, BorrowSourceRepository>();   // INV, SELECT only
+        return services;
+    }
+
+    /// <summary>
+    /// Registers the APPLICATION-OWNED MySQL database (`invc_web`) used by the Borrow module as a writable mirror/workflow store.
+    /// Separate provider, options and factory from INV; schema is created by the versioned scripts under db/mysql (never at startup).
+    /// </summary>
+    public static IServiceCollection AddInvcAppData(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<AppDatabaseOptions>(configuration.GetSection(AppDatabaseOptions.SectionName));
+        services.AddSingleton<IAppDbConnectionFactory, MySqlAppDbConnectionFactory>();
+        services.AddScoped<IBorrowMirrorRepository, BorrowMirrorRepository>();
+        services.AddScoped<BorrowSyncService>();
         return services;
     }
 }

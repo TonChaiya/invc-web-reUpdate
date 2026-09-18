@@ -1,0 +1,102 @@
+@page
+@using Invc.Core.Borrow
+@model Invc.Web.Pages.Borrow.IndexModel
+@{
+    ViewData["Title"] = "ยายืม";
+    ViewData["HideNavSearch"] = true;
+    var o = Model.Overview;
+}
+
+<div class="borrow-page">
+    <div class="borrow-header">
+        <div>
+            <h1 class="borrow-title">ยายืม</h1>
+            <p class="borrow-subtitle">ยาที่ยืมจากหน่วยงานอื่น (INVC ประเภท 09) แยกตามสถานบริการ — ติดตามจนกว่าจะคืนครบ</p>
+        </div>
+        <div class="borrow-sync" aria-live="polite">
+            @if (Model.Sync is { } s)
+            {
+                <span>ซิงก์ INV <time datetime="@s.SyncedAt.ToString("s")">@s.SyncedAt.ToString("d MMM yyyy HH:mm")</time></span>
+                <span>ใหม่ @s.Inserted.ToString("N0") · แก้ไข @s.Updated.ToString("N0") · ลบ @s.Deleted.ToString("N0")</span>
+            }
+            @if (Model.SyncError is not null)
+            {
+                <span class="borrow-sync-warning" role="status">@Model.SyncError</span>
+            }
+        </div>
+    </div>
+
+    @if (Model.HasError)
+    {
+        <div class="alert alert-danger" role="alert">ไม่สามารถอ่านข้อมูลยายืมจากฐานข้อมูลของเว็บได้ กรุณาตรวจสอบหน้า <a asp-page="/Health" class="alert-link">สถานะระบบ</a></div>
+    }
+    else
+    {
+        <div class="borrow-summary" role="group" aria-label="สรุป">
+            <span class="borrow-stat">รายการยืม <strong>@o.ItemCount.ToString("N0")</strong></span>
+            <span class="borrow-stat">สถานบริการ <strong>@o.FacilityCount.ToString("N0")</strong></span>
+            <span class="borrow-stat">บิลที่เกี่ยวข้อง <strong>@o.BillCount.ToString("N0")</strong></span>
+            <span class="borrow-stat">จำนวนรวม <strong>@o.TotalQty.ToString("N0")</strong> หน่วย</span>
+        </div>
+
+        <form method="get" class="borrow-toolbar" role="search" aria-label="ค้นหา">
+            <label class="visually-hidden" for="q">ค้นหา</label>
+            <input class="ds-input" type="search" id="q" name="q" value="@Model.Keyword"
+                   maxlength="@Invc.Core.Inventory.SearchKeyword.MaxLength" autocomplete="off"
+                   placeholder="ค้นหายา รหัสยา หรือเลขบิล" />
+            <button class="ds-btn ds-btn-primary" type="submit">ค้นหา</button>
+            @if (Model.Keyword is not null)
+            {
+                <a class="ds-btn ds-btn-secondary" asp-page="/Borrow/Index">ล้าง</a>
+            }
+        </form>
+
+        <p class="borrow-result-meta">
+            @o.FacilityCount.ToString("N0") สถานบริการ
+            @if (Model.Keyword is not null) { <text>· ค้นหา “@Model.Keyword”</text> }
+        </p>
+
+        @if (o.Facilities.Count == 0)
+        {
+            <div class="borrow-empty" role="status">@(Model.Keyword is null ? "ยังไม่มีรายการยายืม (ประเภท 09) ใน INVC" : $"ไม่พบสถานบริการที่ตรงกับ “{Model.Keyword}”")</div>
+        }
+        else
+        {
+            <div class="borrow-facility-list" role="list" aria-label="สถานบริการที่ให้ยืมยา">
+                <div class="borrow-facility-head" aria-hidden="true">
+                    <span>สถานบริการ</span>
+                    <span class="borrow-num">บิล</span>
+                    <span class="borrow-num borrow-col-items">รายการ</span>
+                    <span class="borrow-num">จำนวน</span>
+                    <span class="borrow-date">ล่าสุด</span>
+                    <span></span>
+                </div>
+                @foreach (var f in o.Facilities)
+                {
+                    <a class="borrow-facility-row" role="listitem" asp-page="/Borrow/Facility" asp-route-facilityCode="@f.FacilityCode">
+                        <span>
+                            <span class="borrow-facility-name">@f.DisplayName</span>
+                            <span class="borrow-facility-code">@f.FacilityCode</span>
+                            <span class="borrow-facility-sub">@f.ItemCount.ToString("N0") รายการ · ล่าสุด @(f.LatestDateReceive?.ToString("d MMM yyyy") ?? "–")</span>
+                        </span>
+                        <span class="borrow-num">@f.BillCount.ToString("N0")</span>
+                        <span class="borrow-num borrow-col-items">@f.ItemCount.ToString("N0")</span>
+                        <span class="borrow-num">@f.TotalQty.ToString("N0")<small>หน่วย</small></span>
+                        <span class="borrow-date">@(f.LatestDateReceive?.ToString("d MMM yyyy") ?? "–")</span>
+                        <svg class="borrow-facility-arrow" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M8 5l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </a>
+                }
+            </div>
+        }
+
+        <details class="borrow-help">
+            <summary>ที่มาของข้อมูล</summary>
+            <ul class="mb-0 mt-2">
+                <li>หัวบิล = INV.OTH_IVO ที่ RCV_TYPE = 09 (ยายืมจากหน่วยงานอื่น) · รายการ = INV.OTH_IVOC ที่ RECEIVE_NO เดียวกัน</li>
+                <li>สถานบริการ = DPT_CODE → COMPANY · ชื่อยา = WORKING_CODE → INV_MD</li>
+                <li>ทุกครั้งที่เปิดหน้านี้ ระบบอ่านข้อมูลประเภท 09 ทั้งหมดจาก INV แล้วปรับสำเนาให้ตรง (เพิ่ม/แก้ไข/ลบ) — INV ไม่ถูกแก้ไข</li>
+                <li>ขั้นตอนยืนยันการคืนและประวัติการคืนยังไม่เปิดใช้ในเวอร์ชันนี้</li>
+            </ul>
+        </details>
+    }
+</div>

@@ -256,7 +256,11 @@ public class ReadOnlySqlReleaseAssertionTests
         foreach (var file in Directory.EnumerateFiles(src, "*.cs", SearchOption.AllDirectories).Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}")))
         {
             var text = File.ReadAllText(file);
-            if (Regex.IsMatch(text, @"(?im)^\s*(INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM|MERGE\s+INTO|TRUNCATE\s+TABLE|CREATE\s+TABLE|ALTER\s+TABLE|DROP\s+TABLE)\b")) offenders.Add($"write SQL: {file}");
+            // The ONLY file allowed to contain write SQL is the MySQL mirror repository (application-owned invc_web database,
+            // Borrow module); its statements are pinned to borrow_source_* tables by BorrowInfrastructureTests. Everything else stays SELECT-only.
+            var isMySqlMirror = file.EndsWith(Path.Combine("Infrastructure", "Borrow", "BorrowMirrorRepository.cs"), StringComparison.OrdinalIgnoreCase);
+            if (!isMySqlMirror && Regex.IsMatch(text, @"(?im)^\s*(INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM|MERGE\s+INTO|TRUNCATE\s+TABLE|CREATE\s+TABLE|ALTER\s+TABLE|DROP\s+TABLE)\b")) offenders.Add($"write SQL: {file}");
+            if (isMySqlMirror && Regex.IsMatch(text, @"(?i)\b(dbo\.|MERGE|TRUNCATE|CREATE\s+TABLE|ALTER|DROP)\b")) offenders.Add($"mirror repository must not reference INV objects or DDL: {file}");
             if (Regex.IsMatch(text, @"(?i)password\s*=\s*[A-Za-z0-9]{4,}") && !file.EndsWith("ProductionConfigurationValidator.cs")) offenders.Add($"credential literal: {file}");
         }
         Assert.Empty(offenders);

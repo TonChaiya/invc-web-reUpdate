@@ -1,0 +1,91 @@
+@page "{facilityCode}"
+@using Invc.Core.Borrow
+@model Invc.Web.Pages.Borrow.FacilityModel
+@{
+    ViewData["Title"] = $"{Model.FacilityName ?? Model.FacilityCode} ({Model.FacilityCode})";
+    ViewData["HideNavSearch"] = true;
+}
+
+<div class="borrow-page">
+    <nav class="borrow-breadcrumb" aria-label="breadcrumb">
+        <a asp-page="/Borrow/Index">ยายืม</a> <span aria-hidden="true">/</span> <span>@(Model.FacilityName ?? Model.FacilityCode)</span>
+    </nav>
+
+    <div class="borrow-header">
+        <div>
+            <h1 class="borrow-title">@(Model.FacilityName ?? Model.FacilityCode)<span class="borrow-title-code borrow-facility-code">@Model.FacilityCode</span></h1>
+        </div>
+        <div class="borrow-sync" aria-live="polite">
+            @if (Model.Sync is { } s) { <span>ซิงก์ INV <time datetime="@s.SyncedAt.ToString("s")">@s.SyncedAt.ToString("d MMM yyyy HH:mm")</time></span> }
+            @if (Model.SyncError is not null) { <span class="borrow-sync-warning" role="status">@Model.SyncError</span> }
+        </div>
+    </div>
+
+    @if (Model.HasError)
+    {
+        <div class="alert alert-danger" role="alert">ไม่สามารถอ่านข้อมูลยายืมจากฐานข้อมูลของเว็บได้ กรุณาตรวจสอบหน้า <a asp-page="/Health" class="alert-link">สถานะระบบ</a></div>
+    }
+    else
+    {
+        <div class="borrow-summary" role="group" aria-label="สรุป">
+            <span class="borrow-stat"><strong>@Model.AllBills.Count.ToString("N0")</strong> บิล</span>
+            <span class="borrow-stat"><strong>@Model.ItemCount.ToString("N0")</strong> รายการ</span>
+            <span class="borrow-stat"><strong>@Model.TotalQty.ToString("N0")</strong> หน่วย</span>
+        </div>
+
+        <form method="get" class="borrow-toolbar" role="search" aria-label="ค้นหาในสถานบริการนี้">
+            <label class="visually-hidden" for="q">ค้นหา</label>
+            <input class="ds-input" type="search" id="q" name="q" value="@Model.Keyword"
+                   maxlength="@Invc.Core.Inventory.SearchKeyword.MaxLength" autocomplete="off"
+                   placeholder="ค้นหายา รหัสยา หรือเลขบิล" />
+            <button class="ds-btn ds-btn-primary" type="submit">ค้นหา</button>
+            @if (Model.Keyword is not null)
+            {
+                <a class="ds-btn ds-btn-secondary" asp-page="/Borrow/Facility" asp-route-facilityCode="@Model.FacilityCode">ล้าง</a>
+            }
+        </form>
+        @if (Model.Keyword is not null)
+        {
+            <p class="borrow-result-meta">ค้นหา “@Model.Keyword” · พบ @Model.ShownItemCount.ToString("N0") รายการ ใน @Model.Bills.Count.ToString("N0") บิล</p>
+        }
+
+        @if (Model.Bills.Count == 0)
+        {
+            <div class="borrow-empty" role="status">ไม่พบรายการที่ตรงกับ “@Model.Keyword”</div>
+        }
+        else
+        {
+        <div class="borrow-bill-list">
+        @foreach (var bill in Model.Bills)
+        {
+            <section class="borrow-bill" aria-label="บิล @bill.ReceiveNo">
+                <header class="borrow-bill-header">
+                    <span class="borrow-bill-no">@bill.ReceiveNo</span>
+                    <span class="borrow-bill-date">@(bill.DateReceive?.ToString("d MMM yyyy") ?? "ไม่ระบุวันที่")</span>
+                    <span class="borrow-bill-meta">
+                        @if (!string.IsNullOrWhiteSpace(bill.InvoiceNo)) { <span>เอกสาร @bill.InvoiceNo</span><span class="dot"></span> }
+                        <span>@bill.Items.Count.ToString("N0") รายการ</span>
+                    </span>
+                </header>
+                <div class="borrow-item-list">
+                @foreach (var item in bill.Items)
+                {
+                    <div class="borrow-item-row">
+                        <div>
+                            <a class="borrow-item-name" asp-page="/Inventory/Detail" asp-route-workingCode="@item.WorkingCode">@(item.DrugName ?? item.WorkingCode)</a>
+                            <div class="borrow-item-meta">
+                                <span>@item.WorkingCode</span>
+                                @if (item.PackRatio is { } pr) { <span class="dot"></span><span>Pack @pr.ToString("N0")</span> }
+                                @if (!string.IsNullOrWhiteSpace(item.LotNo)) { <span class="dot"></span><span>Lot @item.LotNo</span> }
+                            </div>
+                        </div>
+                        <div class="borrow-item-qty">@((item.QtyOrder ?? 0m).ToString("N0"))<small>หน่วย</small></div>
+                    </div>
+                }
+                </div>
+            </section>
+        }
+        </div>
+        }
+    }
+</div>
