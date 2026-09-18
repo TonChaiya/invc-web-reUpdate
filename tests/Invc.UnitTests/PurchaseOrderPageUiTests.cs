@@ -257,6 +257,51 @@ public sealed class PurchaseOrderPageUiTests : IClassFixture<PurchaseOrderPageUi
         Assert.DoesNotContain("class=\"card", html);
     }
 
+    /// <summary>INVC with no purchase orders at all (empty MS_PO, no open BUDGET year): the pages must still open.</summary>
+    public sealed class EmptyFactory : WebApplicationFactory<Program>
+    {
+        private sealed class EmptyRepo : IPurchaseOrderRepository
+        {
+            public Task<IReadOnlyList<int>> GetOpenBudgetYearsAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<int>>([]);
+            public Task<IReadOnlyList<int>> GetPoFiscalYearsAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<int>>([]);
+            public Task<IReadOnlyList<DateTime>> GetBillOutDatesAsync(int fy, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<DateTime>>([]);
+            public Task<IReadOnlyList<PurchaseOrderSummary>> GetHeadersAsync(int fy, string? q, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<PurchaseOrderSummary>>([]);
+            public Task<PurchaseOrderDetail?> GetDetailAsync(string realPo, CancellationToken ct = default) => Task.FromResult<PurchaseOrderDetail?>(null);
+        }
+
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            builder.UseEnvironment("Development");
+            builder.UseSetting("InvDatabase:ConnectionString", "Server=test;Initial Catalog=INV;Integrated Security=True");
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IPurchaseOrderRepository>();
+                services.AddSingleton<IPurchaseOrderRepository>(new EmptyRepo());
+            });
+        }
+    }
+
+    [Fact]
+    public async Task List_opens_normally_when_invc_has_no_purchase_orders_at_all()
+    {
+        using var factory = new EmptyFactory();
+        using var client = factory.CreateClient();
+        var r = await client.GetAsync("/PurchaseOrders");
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        var html = WebUtility.HtmlDecode(await r.Content.ReadAsStringAsync());
+        var text = Text(html);
+        var fy = Invc.Core.Common.ThaiFiscalYear.FromDate(DateTime.Today);
+        Assert.Contains($"ปีงบ {fy}", text);                                     // falls back to the current Thai fiscal year
+        Assert.Contains("ยังไม่มีใบสั่งซื้อ — ใช้ปีงบประมาณปัจจุบัน", text);      // explained, not an error
+        Assert.Equal(6, Regex.Matches(html, "<a class=\"po-tab").Count);         // selector still there, all counts 0
+        Assert.Contains($"ไม่มีใบสั่งซื้อในปีงบประมาณ {fy}", text);
+        Assert.DoesNotContain("alert-danger", html);
+        Assert.DoesNotContain("Exception", html);
+        // detail / print of a PO that does not exist → clean 404, not a crash
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/PurchaseOrders/Detail/K6900001")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/PurchaseOrders/Print/K6900001")).StatusCode);
+    }
+
     [Fact]
     public void Po_css_has_no_inner_scroll_container()
     {
