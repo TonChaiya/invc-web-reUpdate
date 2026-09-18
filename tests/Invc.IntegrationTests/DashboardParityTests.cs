@@ -200,30 +200,38 @@ public class DashboardParityTests(ProductionReadOnlyFixture db, ITestOutputHelpe
     }
 
     [SkippableFact]
-    public async Task D9_monthly_movement_categories_and_values_match_legacy_grouping()
+    public async Task D9_processed_monthly_report_matches_mnth_sum_and_mbs_re_m_and_reports_identity_differences_unchanged()
     {
         var (snap, _) = await BuildAsync();
         await using var c = await db.RequireOrSkip().OpenAsync();
-        // table_monthly_rpt.asp: MType = R_S_STATUS + LEFT(R_S_NUMBER,1), Mnth = yyyymm + 54300, for the Thai fiscal year.
-        var raw = (await c.QueryAsync<(string MType, string Mnth, int N, decimal? V)>(ReadOnlySql.Ensure("""
-            SELECT R_S_STATUS + LEFT(R_S_NUMBER,1), CAST(CAST(LEFT(CONVERT(char(8), OPERATE_DATE, 112), 6) AS int) + 54300 AS varchar(6)), COUNT(*), SUM(card.[VALUE])
-            FROM dbo.CARD
-            WHERE CASE WHEN MONTH(OPERATE_DATE) >= 10 THEN YEAR(OPERATE_DATE) + 543 + 1 ELSE YEAR(OPERATE_DATE) + 543 END = @Fy
-            GROUP BY R_S_STATUS + LEFT(R_S_NUMBER,1), LEFT(CONVERT(char(8), OPERATE_DATE, 112), 6)
-            """), new { Fy = snap.FiscalYear })).ToList();
-        var months = snap.Movement.Value!;
-        var flat = months.SelectMany(m => m.Categories.Select(cat => (m.MonthKey, cat.Category.Key, cat.Count, cat.Value))).ToList();
-
-        output.WriteLine($"D9 FY{snap.FiscalYear}: raw cells {raw.Count} (categories {string.Join(",", raw.Select(r => r.MType).Distinct().Order())}); dashboard cells {flat.Count}, months {months.Count}");
-        Assert.Equal(raw.Count, flat.Count);
-        foreach (var r in raw)
+        var months = snap.Movement.Value!.Months;
+        Skip.If(months.Count == 0, "no processed months in this fiscal year");
+        // direct per-month totals from the source tables (CE keys), independent of the repository statements
+        var raw = (await c.QueryAsync<(string K, decimal Val, decimal Qty)>(ReadOnlySql.Ensure(
+            "SELECT RTRIM(YEAR) + RIGHT('0' + RTRIM(MONTH), 2), SUM(TOTAL_VALUE), SUM(QTY_REMAIN) FROM dbo.MNTH_SUM GROUP BY RTRIM(YEAR) + RIGHT('0' + RTRIM(MONTH), 2)"))).ToDictionary(r => r.K);
+        var flow = (await c.QueryAsync<(string K, decimal Rcv, decimal Sale)>(ReadOnlySql.Ensure(
+            "SELECT RTRIM(YEAR) + RIGHT('0' + RTRIM(MONTH), 2), SUM(RCV_VALUE), SUM(SALE_VALUE) FROM dbo.MBS_RE_M GROUP BY RTRIM(YEAR) + RIGHT('0' + RTRIM(MONTH), 2)"))).ToDictionary(r => r.K);
+        foreach (var m in months)
         {
-            var n = flat.Single(f => f.MonthKey == r.Mnth && f.Key == r.MType);
-            Assert.Equal(r.N, n.Count);
-            Assert.Equal(r.V ?? 0m, n.Value);
+            var ce = (int.Parse(m.MonthKey[..4]) - 543).ToString() + m.MonthKey[4..];
+            Assert.Equal(raw[ce].Val, m.EndingValue); Assert.Equal(raw[ce].Qty, m.EndingQty);
+            Assert.Equal(flow.TryGetValue(ce, out var f) ? f.Rcv : 0m, m.ReceiveValue);
+            Assert.Equal(f.Sale, m.IssueValue);
+            var prevCe = (int.Parse(DashboardMonthKey.Previous(m.MonthKey)[..4]) - 543).ToString() + DashboardMonthKey.Previous(m.MonthKey)[4..];
+            if (raw.TryGetValue(prevCe, out var p))
+            {
+                Assert.Equal(p.Val, m.OpeningValue);
+                // The identity prev + RCV − SALE = ending is a property of INVC's processing, not of this report: the report must
+                // surface any discrepancy unchanged (the audit of 2026-09-18 documents −150.00 in 2025-10/11 from WORKING_CODE 1000170).
+                var expectedDiff = raw[ce].Val - (p.Val + (flow.TryGetValue(ce, out var ff) ? ff.Rcv - ff.Sale : 0m));
+                Assert.Equal(expectedDiff, m.Difference);
+                if (expectedDiff != 0m) output.WriteLine($"  NOTE {m.MonthKey}: INVC identity discrepancy {expectedDiff:N2} (reported as ส่วนต่างจากผลประมวลผล)");
+            }
+            else { Assert.Null(m.OpeningValue); }
+            Assert.True(m.TypesMatchTotals, $"type breakdown of {m.MonthKey} must re-add to the month totals");
+            output.WriteLine($"{m.MonthKey}: opening {m.OpeningValue?.ToString("N2") ?? "–"} + {m.ReceiveValue:N2} − {m.IssueValue:N2} = {m.EndingValue:N2} (diff {m.Difference?.ToString("N2") ?? "–"})");
         }
-        // Simplified receive/issue/other must partition every category (nothing dropped).
-        foreach (var m in months) { Assert.Equal(m.Categories.Sum(cat => cat.Value), m.ReceiveValue + m.IssueValue + m.OtherValue); }
+        Assert.Equal(months.OrderByDescending(x => x.MonthKey, StringComparer.Ordinal).Select(x => x.MonthKey), months.Select(x => x.MonthKey));
     }
 
     [SkippableFact]
@@ -321,8 +329,8 @@ public class DashboardParityTests(ProductionReadOnlyFixture db, ITestOutputHelpe
         public Task<DashboardStockCoverage> GetStockCoverageAsync(CancellationToken ct = default) => throw Boom();
         public Task<IReadOnlyList<DashboardEdNedRow>> GetLegacyEdNedAsync(CancellationToken ct = default) => throw Boom();
         public Task<IReadOnlyList<DashboardAgreementRow>> GetActiveAgreementsAsync(DateTime today, CancellationToken ct = default) => throw Boom();
-        public Task<IReadOnlyList<DashboardMovementRow>> GetMovementAsync(int fiscalYear, CancellationToken ct = default) => throw Boom();
-        public Task<IReadOnlyList<DashboardMovementItemTypeRow>> GetMovementByItemTypeAsync(int fiscalYear, CancellationToken ct = default) => throw Boom();
+        public Task<IReadOnlyList<DashboardProcessedSnapshotRow>> GetProcessedSnapshotsAsync(int fiscalYear, CancellationToken ct = default) => throw Boom();
+        public Task<IReadOnlyList<DashboardProcessedFlowRow>> GetProcessedFlowsAsync(int fiscalYear, CancellationToken ct = default) => throw Boom();
         public Task<IReadOnlyList<DashboardProcessTimeRow>> GetProcessTimeAsync(int fiscalYear, CancellationToken ct = default) => throw Boom();
         public Task<DashboardItemTrend?> GetItemTrendAsync(string workingCode, int months, CancellationToken ct = default) => throw Boom();
     }

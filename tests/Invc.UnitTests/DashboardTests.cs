@@ -35,22 +35,6 @@ public class DashboardRulesTests
             DashboardRules.AgreementRemaining(agree, buy, pack, price is null ? null : decimal.Parse(price)));
 
     [Theory]
-    [InlineData("R", "O6900085", "RO", MovementDirection.Receive)]
-    [InlineData("R", "S6900001", "RS", MovementDirection.Receive)]
-    [InlineData("S", "S6900001", "SS", MovementDirection.Issue)]
-    [InlineData("S", "O6900001", "SO", MovementDirection.Issue)]
-    [InlineData("X", "Q1", "XQ", MovementDirection.Other)]
-    [InlineData(null, null, "??", MovementDirection.Other)]
-    [InlineData("S", "", "S?", MovementDirection.Issue)]
-    public void MovementCategory_preserves_raw_key_and_maps_direction(string? status, string? number, string key, MovementDirection dir)
-    {
-        var c = MovementCategory.FromRaw(status, number);
-        Assert.Equal(key, c.Key);
-        Assert.Equal(dir, c.Direction);
-        Assert.False(string.IsNullOrWhiteSpace(c.ThaiLabel));
-    }
-
-    [Theory]
     [InlineData(2026, 9, 30, 2569, "256909")]
     [InlineData(2026, 10, 1, 2570, "256910")]
     [InlineData(2025, 10, 1, 2569, "256810")]
@@ -81,80 +65,86 @@ public class DashboardRulesTests
 
 public class DashboardCompositionTests
 {
-    [Fact]
-    public void Movement_rows_group_into_months_and_directions_without_dropping_categories()
-    {
-        var rows = new List<DashboardMovementRow>
-        {
-            new("256810", "R", "O", 10, 1000m, 50m),
-            new("256810", "S", "S", 20, 800m, 40m),
-            new("256810", "S", "O", 1, 5m, 1m),
-            new("256811", "R", "S", 2, 12m, 3m),
-        };
-        var months = DashboardMovement.Build(rows);
+    private static DashboardProcessedSnapshotRow Snap(int y, int m, string? ed, decimal qty, decimal val, int items = 1)
+        => new(y, m, ed, ed switch { "1" => "ยาในบัญชียาหลักแห่งชาติ", "2" => "ยานอกบัญชียาหลักแห่งชาติ", "3" => "วัสดุการแพทย์", "4" => "วัสดุเภสัชกรรม", "5" => "ยาตัวอย่างเพื่อทดลองใช้", _ => null }, items, qty, val);
+    private static DashboardProcessedFlowRow Flow(int y, int m, string? ed, decimal rq, decimal rv, decimal sq, decimal sv)
+        => new(y, m, ed, ed switch { "1" => "ยาในบัญชียาหลักแห่งชาติ", "2" => "ยานอกบัญชียาหลักแห่งชาติ", "3" => "วัสดุการแพทย์", _ => null }, 1, rq, rv, sq, sv);
 
-        Assert.Equal(2, months.Count);
-        var oct = months.Single(m => m.MonthKey == "256810");
-        Assert.Equal(1000m, oct.ReceiveValue);
-        Assert.Equal(805m, oct.IssueValue);
-        Assert.Equal(3, oct.Categories.Count);                          // RO, SS, SO all retained
-        Assert.Equal(31, oct.Categories.Sum(c => c.Count));
-        Assert.Equal(rows.Where(r => r.MonthKey == "256810").Sum(r => r.Value), oct.ReceiveValue + oct.IssueValue + oct.OtherValue);
-        Assert.Equal("ต.ค. 2568", oct.DisplayMonth);
-        Assert.Equal(new[] { "256811", "256810" }, months.Select(m => m.MonthKey));   // newest first
+    [Fact]
+    public void Processed_month_keys_follow_the_thai_fiscal_year_and_ce_storage()
+    {
+        Assert.Equal("256810", DashboardMonthKey.FromCe(2025, 10));
+        Assert.Equal(["256810", "256811", "256812", "256901", "256902", "256903", "256904", "256905", "256906", "256907", "256908", "256909"], DashboardMonthKey.FiscalYearMonths(2569));
+        Assert.Equal("256809", DashboardMonthKey.Previous("256810"));
+        Assert.Equal("256812", DashboardMonthKey.Previous("256901"));
+        Assert.Equal("ก.ย. 2569", DashboardMonthKey.Display("256909"));
+        Assert.Equal(("202509", "202609"), Invc.Infrastructure.Dashboard.DashboardAnalyticsRepository.ProcessedWindow(2569, includePrecedingMonth: true));
+        Assert.Equal(("202510", "202609"), Invc.Infrastructure.Dashboard.DashboardAnalyticsRepository.ProcessedWindow(2569, includePrecedingMonth: false));
     }
 
     [Fact]
-    public void Movement_item_types_split_each_month_and_re_add_exactly_to_the_d9_totals()
+    public void Processed_months_carry_previous_ending_as_opening_and_satisfy_the_identity_per_type()
     {
-        var rows = new List<DashboardMovementRow>
+        // Live-shaped fixture (Sep 2026 evidence): Aug ending by type → Sep opening; MBS_RE_M flows; Sep ending.
+        var snaps = new[]
         {
-            new("256810", "R", "O", 10, 1000m, 50m),
-            new("256810", "S", "S", 20, 800m, 40m),
-            new("256810", "S", "O", 1, 5m, 1m),
-            new("256810", "X", "Q", 1, 7m, 1m),
-            new("256811", "R", "S", 2, 12m, 3m),
+            Snap(2026, 8, "1", 148_812, 75_537.79m, 218), Snap(2026, 8, "2", 3_516, 681.89m, 12), Snap(2026, 8, "3", 8_617, 28_678.17m, 86),
+            Snap(2026, 9, "1", 142_672, 71_502.19m, 218), Snap(2026, 9, "2", 3_016, 446.89m, 12), Snap(2026, 9, "3", 8_558, 27_097.82m, 86),
         };
-        // the same cells split by item type (ED / NED / MES / EA / SAM / unknown); sums per (month, status, prefix) equal the rows above
-        var typed = new List<DashboardMovementItemTypeRow>
+        var flows = new[]
         {
-            new("256810", "R", "O", "1", "ยาในบัญชียาหลักแห่งชาติ", 6, 600m, 30m),
-            new("256810", "R", "O", "2", "ยานอกบัญชียาหลักแห่งชาติ", 2, 150m, 10m),
-            new("256810", "R", "O", "3", "วัสดุการแพทย์", 1, 200m, 5m),
-            new("256810", "R", "O", null, null, 1, 50m, 5m),                 // unresolved item → unknown bucket, never dropped
-            new("256810", "S", "S", "1", "ยาในบัญชียาหลักแห่งชาติ", 15, 700m, 30m),
-            new("256810", "S", "S", "4", "วัสดุเภสัชกรรม", 5, 100m, 10m),
-            new("256810", "S", "O", "5", "ยาตัวอย่างเพื่อทดลองใช้", 1, 5m, 1m),
-            new("256810", "X", "Q", "1", "ยาในบัญชียาหลักแห่งชาติ", 1, 7m, 1m),
-            new("256811", "R", "S", "2", "ยานอกบัญชียาหลักแห่งชาติ", 2, 12m, 3m),
+            Flow(2026, 9, "1", 54_000, 28_858.65m, 60_140, 32_894.25m), Flow(2026, 9, "2", 0, 0m, 500, 235m), Flow(2026, 9, "3", 111, 670m, 170, 2_250.35m),
         };
-        var months = DashboardMovement.Build(rows, typed);
+        var r = DashboardProcessedMovementBuilder.Build(2569, snaps, flows);
+        Assert.Equal(["256909", "256908"], r.Months.Select(m => m.MonthKey));          // newest processed month first, only processed months
+        var sep = r.Months[0];
+        Assert.Equal("256908", sep.PreviousMonthKey);
+        Assert.Equal(104_897.85m, sep.OpeningValue);                                  // previous MNTH_SUM ending becomes opening
+        Assert.Equal(29_528.65m, sep.ReceiveValue); Assert.Equal(35_379.60m, sep.IssueValue); Assert.Equal(99_046.90m, sep.EndingValue);
+        Assert.Equal(99_046.90m, sep.CalculatedEnding); Assert.Equal(0m, sep.Difference); Assert.Equal(0m, sep.QtyDifference);
+        Assert.Equal(316, sep.ItemCount);
+        // by type: exact identity, ED/NED separate, drug subtotal = 1 + 2 only, grand total = actual categories
+        Assert.Equal(["1", "2", "3"], sep.Types.Select(t => t.Code));
+        Assert.Equal((75_537.79m, 28_858.65m, 32_894.25m, 71_502.19m, 0m), (sep.Type("1")!.OpeningValue, sep.Type("1")!.ReceiveValue, sep.Type("1")!.IssueValue, sep.Type("1")!.EndingValue, sep.Type("1")!.Difference));
+        Assert.Equal((681.89m, 0m, 235m, 446.89m, 0m), (sep.Type("2")!.OpeningValue, sep.Type("2")!.ReceiveValue, sep.Type("2")!.IssueValue, sep.Type("2")!.EndingValue, sep.Type("2")!.Difference));
+        Assert.Equal((28_678.17m, 670m, 2_250.35m, 27_097.82m, 0m), (sep.Type("3")!.OpeningValue, sep.Type("3")!.ReceiveValue, sep.Type("3")!.IssueValue, sep.Type("3")!.EndingValue, sep.Type("3")!.Difference));
+        Assert.Equal((76_219.68m, 28_858.65m, 33_129.25m, 71_949.08m), (sep.DrugOpeningValue, sep.DrugReceiveValue, sep.DrugIssueValue, sep.DrugEndingValue));
+        Assert.Equal(104_897.85m, sep.TypeOpeningTotal); Assert.Equal(29_528.65m, sep.TypeReceiveTotal); Assert.Equal(35_379.60m, sep.TypeIssueTotal); Assert.Equal(99_046.90m, sep.TypeEndingTotal);
+        Assert.True(sep.TypesMatchTotals);
+        Assert.Equal(sep.OpeningValue, sep.TypeOpeningTotal);                         // drug subtotal not added again
+        // Aug is the first snapshot loaded → no previous calendar month → opening null, never 0
+        var aug = r.Months[1];
+        Assert.False(aug.HasOpening); Assert.Null(aug.OpeningValue); Assert.Null(aug.Difference); Assert.Null(aug.PreviousMonthKey);
+        Assert.Equal(0m, aug.ReceiveValue); Assert.Equal(104_897.85m, aug.EndingValue);
+        Assert.All(aug.Types, t => Assert.Null(t.OpeningValue));
+    }
 
-        Assert.Equal(new[] { "256811", "256810" }, months.Select(m => m.MonthKey));   // still newest first
-        var oct = months.Single(m => m.MonthKey == "256810");
-        // D9 totals untouched
-        Assert.Equal(1000m, oct.ReceiveValue); Assert.Equal(805m, oct.IssueValue); Assert.Equal(7m, oct.OtherValue); Assert.Equal(32, oct.Count);
-        Assert.Equal(4, oct.Categories.Count);        // RO/SS/SO/XQ transaction categories all retained (other dimension untouched)
-        Assert.Contains(oct.Categories, c => c.Category.Key == "XQ");
-        // types: 1,2,3,4,5 + unknown, unknown last
-        Assert.Equal(new[] { "1", "2", "3", "4", "5", "?" }, oct.ItemTypes.Select(t => t.Code));
-        Assert.Equal("ไม่ระบุประเภท", oct.Type("?")!.Name);
-        Assert.Equal(600m, oct.Type("1")!.ReceiveValue); Assert.Equal(700m, oct.Type("1")!.IssueValue); Assert.Equal(7m, oct.Type("1")!.OtherValue);
-        Assert.Equal(200m, oct.Type("3")!.ReceiveValue); Assert.Equal(100m, oct.Type("4")!.IssueValue); Assert.Equal(5m, oct.Type("5")!.IssueValue);
-        Assert.Equal(50m, oct.Type("?")!.ReceiveValue);
-        // ยา รวม = ED + NED only (3/4/5 stay separate) and is a subtotal, not part of the grand total
-        Assert.Equal(750m, oct.DrugReceiveValue); Assert.Equal(700m, oct.DrugIssueValue); Assert.Equal(7m, oct.DrugOtherValue);
-        Assert.Equal(oct.ReceiveValue, oct.TypeReceiveTotal);
-        Assert.Equal(oct.IssueValue, oct.TypeIssueTotal);
-        Assert.Equal(oct.OtherValue, oct.TypeOtherTotal);
-        Assert.Equal(600m + 150m + 200m + 0m + 0m + 50m, oct.TypeReceiveTotal);         // ED+NED+MES+EA+SAM+unknown, DrugTotal not added again
-        Assert.True(oct.TypesMatchTotals);
-        var nov = months.Single(m => m.MonthKey == "256811");
-        Assert.Equal(12m, nov.DrugReceiveValue); Assert.True(nov.TypesMatchTotals);
-        // a month without typed rows keeps working (no breakdown, totals intact)
-        var partial = DashboardMovement.Build(rows, typed.Where(t => t.MonthKey == "256811"));
-        Assert.Empty(partial.Single(m => m.MonthKey == "256810").ItemTypes);
-        Assert.Equal(1000m, partial.Single(m => m.MonthKey == "256810").ReceiveValue);
+    [Fact]
+    public void Processed_months_do_not_bridge_missing_calendar_months_and_keep_unknown_and_other_types()
+    {
+        var snaps = new[]
+        {
+            Snap(2025, 9, "1", 10, 100m),                       // Sep 2025: preceding month of FY2569 — opening source for Oct only
+            Snap(2025, 10, "1", 12, 120m), Snap(2025, 10, "4", 1, 5m), Snap(2025, 10, "5", 2, 7m), Snap(2025, 10, null, 3, 9m),
+            Snap(2025, 12, "1", 20, 200m),                      // Nov 2025 NOT processed → Dec has no opening
+            Snap(2026, 9, "1", 30, 300m),                       // Sep 2026 (Aug missing) → no opening
+            Snap(2026, 10, "1", 99, 999m),                      // Oct 2026 belongs to FY2570 → excluded
+        };
+        var flows = new[] { Flow(2025, 10, "1", 5, 50m, 3, 30m), Flow(2025, 10, "4", 1, 5m, 0, 0m), Flow(2025, 10, "5", 2, 7m, 0, 0m), Flow(2025, 10, null, 3, 9m, 0, 0m), Flow(2025, 12, "1", 1, 10m, 0, 0m) };
+        var r = DashboardProcessedMovementBuilder.Build(2569, snaps, flows);
+        Assert.Equal(["256909", "256812", "256810"], r.Months.Select(m => m.MonthKey));   // Sep 2025 is not a FY month; Oct 2026 excluded
+        var oct = r.Months.Single(m => m.MonthKey == "256810");
+        Assert.Equal(100m, oct.OpeningValue); Assert.Equal("256809", oct.PreviousMonthKey);
+        Assert.Equal(141m, oct.EndingValue); Assert.Equal(71m, oct.ReceiveValue); Assert.Equal(30m, oct.IssueValue);
+        Assert.Equal(141m - (100m + 71m - 30m), oct.Difference);                            // fixture identity does not hold → difference reported, not hidden
+        Assert.Equal(["1", "4", "5", "?"], oct.Types.Select(t => t.Code));                  // codes 4/5 separate, unknown last and retained
+        Assert.Equal("ไม่ระบุประเภท", oct.Type("?")!.Name); Assert.Equal(9m, oct.Type("?")!.EndingValue);
+        Assert.Equal(oct.EndingValue, oct.TypeEndingTotal);
+        var dec = r.Months.Single(m => m.MonthKey == "256812");
+        Assert.False(dec.HasOpening); Assert.Null(dec.PreviousMonthKey);                    // Nov missing → not bridged to Oct
+        Assert.Equal(10m, dec.ReceiveValue); Assert.Equal(200m, dec.EndingValue);
+        Assert.False(r.Months.Single(m => m.MonthKey == "256909").HasOpening);
+        Assert.Equal("256909", r.Latest!.MonthKey);
     }
 
     [Fact]
@@ -218,7 +208,7 @@ public class DashboardCompositionTests
             Coverage = DashboardSection<DashboardStockCoverage>.Failed("x"),
             EdNed = DashboardSection<IReadOnlyList<DashboardEdNedRow>>.Failed("x"),
             Agreements = DashboardSection<DashboardAgreements>.Failed("x"),
-            Movement = DashboardSection<IReadOnlyList<DashboardMovementMonth>>.Failed("x"),
+            Movement = DashboardSection<DashboardProcessedMovement>.Failed("x"),
             ProcessTime = DashboardSection<IReadOnlyList<DashboardProcessTimeRow>>.Failed("x"),
             ItemTrend = DashboardSection<DashboardItemTrend?>.Ok(null),
         };

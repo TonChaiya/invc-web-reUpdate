@@ -12,12 +12,12 @@ The root route `/` is the dashboard. `DashboardService` (Core) **composes**; it 
 | Reorder red / yellow / Σ red suggested | `IReorderRepository` + `ReorderReport` (Phase 3) | current state |
 | PO pipeline cards (D2) | `IPurchaseOrderRepository` + `PurchaseOrderReport` / `PurchaseOrderRules` (Phase 4) | fiscal year |
 | Non-PO receipts | `INonPoReceiptRepository` + `ReceiptReport` (Phase 5) | fiscal year |
-| Budget (D1), Sub-store (D4), Coverage (D5), legacy ED/NED (D6), Agreements (D7), CARD movement (D9), item trend (D10), PO process time (C11) | `IDashboardAnalyticsRepository` (`DashboardAnalyticsRepository`, 9 explicit SELECTs) — legacy KPIs with no domain owner | D1/D9/C11 fiscal year; D4/D5/D6/D7/D10 current or own period |
+| Budget (D1), Sub-store (D4), Coverage (D5), legacy ED/NED (D6), Agreements (D7), processed monthly movement (D9: MNTH_SUM + MBS_RE_M), item trend (D10: CARD), PO process time (C11) | `IDashboardAnalyticsRepository` (`DashboardAnalyticsRepository`, 10 explicit SELECTs) — legacy KPIs with no domain owner | D1/D9/C11 fiscal year; D4/D5/D6/D7/D10 current or own period |
 Unit tests forbid the dashboard SQL from touching `OTH_IVO`, `MIN_LEVEL`, PO status sets or the legacy hard-coded item `2010930`.
 
 ## Fiscal-year behaviour
 `?fy=` validated (2500–2599) else ignored; default reuses Phase 4 `DefaultFiscalYear.Choose` (single open BUDGET year → **2569**;
-multiple/none → deterministic fallback with an on-page note). FY drives Budget, PO pipeline, receipts, CARD movement and process time
+multiple/none → deterministic fallback with an on-page note). FY drives Budget, PO pipeline, receipts, processed monthly movement and process time
 (typed `[1 Oct, 1 Oct)` window / PO prefix parameter). Inventory, reorder, sub-store, coverage, ED/NED and agreements are
 current-state and ignore FY; the section headers say so. `?item=` (D10) is validated to 1–7 alphanumerics.
 
@@ -32,7 +32,7 @@ current-state and ignore FY; the section headers say so. `?item=` (D10) is valid
 | D6 ED/NED (legacy filter NOUSE+OUT_OF_LIST+PO_INDIVIDUAL) | ED 173 / 73 638.64 · NED 8 / 461.08 · MES 86 / 30 592.82 | identical; equal to the Phase 2 NOUSE-only groups today (documented semantic difference kept: dashboard uses the legacy filter) | **PASS** |
 | D7 agreements | 0 active | 0 → renders "ไม่มีสัญญาคงเหลือ" (not a financial zero) | **PASS** |
 | D8 active item count | 267 (`NOUSE IS NULL`) | 267 == `InventorySummary` | **PASS** |
-| D9 monthly movement | 34 month×category cells, categories RO, RS, SO, SS; count and Σ VALUE per cell | identical; receive/issue/other partition sums equal raw totals per month | **PASS** |
+| D9 monthly movement (re-executed 2026-09-18) | INVC processed months only: ending = Σ MNTH_SUM.TOTAL_VALUE / QTY_REMAIN per CE month; receive/issue = Σ MBS_RE_M.RCV_VALUE / SALE_VALUE; opening = previous calendar month's MNTH_SUM (never bridged); type split = RTRIM(ED_NED) → TBLED_NED | identical for all 12 processed months of FY2569 (2568-10 … 2569-09); type rows re-add to month totals; identity prev + RCV − SALE = ending exact except **2025-10 / 2025-11 (−150.00, WORKING_CODE 1000170 — INVC data anomaly, see “Monthly movement — authority” below)**, which the page shows as “ส่วนต่างจากผลประมวลผล” | **PASS** (parity) / **MEASURED** (identity) |
 | D10 item trend | 1001710 SIMVASTATIN, 1001460 AMLODIPINE (top issuers, chosen dynamically): 12 months each, qty & value per month | identical; unknown/malformed code → null/notice; no default item | **PASS** (interactive, `?item=`) |
 | C11 process time | FY2569: 1 PO month (2026-03), send/doc/acc all NULL | identical; UI shows N/A | **MEASURED — no completed stage data** |
 | Cross-domain | Inventory 267/104 692.54 · Reorder 47/0/39 997 · PO issued 1 · Receipts 81/575/352 744.24 | dashboard sections equal module reports (count, qty, value, buckets, type count) | **PASS** |
@@ -40,7 +40,13 @@ Unexplained deltas: **none**.
 
 ## New dashboard additions (not in legacy)
 Reorder card (red count, yellow count, Σ red suggested → `/Reorder?status=red`), non-PO receipts card (headers, lines, verified
-TOTAL_VALUE → `/Receipts?fy=`), status-code legend in movement table, as-of timestamp, section-level failure isolation.
+TOTAL_VALUE → `/Receipts?fy=`), as-of timestamp, section-level failure isolation.
+
+## Monthly movement — authority (replaces the CARD-based table, 2026-09-18)
+- Authority = INVC month-end processing: `MNTH_SUM` (complete snapshot, every item; CE `YEAR` nvarchar(4) + 2-char `MONTH`) for opening/ending value and quantity, `MBS_RE_M` (only items with movement) for RCV_*/SALE_* flows. `MBS_RE_M.REMAIN_*` is **not** a store total and is never used. `MBS_RE_Y` is UNRESOLVED and unused.
+- Only processed months are listed (a month exists iff it has MNTH_SUM rows); the opening of a month is the immediately preceding calendar month's MNTH_SUM and is `null` (shown as “ไม่มียอดสิ้นเดือนก่อนหน้า”) when that month was not processed — never bridged.
+- `CARD` remains the ledger for the per-item trend (D10) only.
+- Known identity discrepancy: 2025-10 and 2025-11 differ by −150.00 (item 1000170: zero-valued return receipt O6800016 followed by a valued issue S6800013; the owner's manual correction of 2026-09-18 re-processed 2025-09 only). The report surfaces the difference unchanged; it is not corrected in the app (INV is read-only).
 
 ## Intentional deviations from legacy
 1. Main-store value = Phase 2 active definition (Dashboard.asp used all rows). 2. Lookups LEFT JOIN / safe (SUBSTOCK dept, TBLED_NED).

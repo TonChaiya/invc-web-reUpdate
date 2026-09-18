@@ -41,7 +41,7 @@ public sealed class DashboardService(
         var coverage = await Section(() => analytics.GetStockCoverageAsync(ct));
         var edNed = await Section(() => analytics.GetLegacyEdNedAsync(ct));
         var agreements = await Section(async () => Summarize(await analytics.GetActiveAgreementsAsync(now, ct)));
-        var movement = await Section(async () => DashboardMovement.Build(await analytics.GetMovementAsync(fy, ct), await analytics.GetMovementByItemTypeAsync(fy, ct)));
+        var movement = await Section(async () => DashboardProcessedMovementBuilder.Build(fy, await analytics.GetProcessedSnapshotsAsync(fy, ct), await analytics.GetProcessedFlowsAsync(fy, ct)));
         var processTime = await Section(() => analytics.GetProcessTimeAsync(fy, ct));
         var normalizedItem = DashboardRules.NormalizeItemCode(itemCode);
         var trend = normalizedItem is null

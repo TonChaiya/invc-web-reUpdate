@@ -20,38 +20,28 @@
 }
 
 <div class="dashboard-page ds-page">
+<h1 class="visually-hidden">ภาพรวม</h1>
 @if (Model.Health is { IsHealthy: false })
 {
-    <div class="ds-page-header dashboard-header">
-        <div>
-            <h1 class="ds-page-title">ภาพรวม</h1>
-            <p class="ds-page-subtitle">สถานะคลังเวชภัณฑ์และงานที่ต้องดำเนินการ</p>
-        </div>
-    </div>
     <div class="ds-error dashboard-error" role="alert">
         <strong>เชื่อมต่อฐานข้อมูล INV ไม่ได้</strong> — ภาพรวมไม่สามารถแสดงข้อมูลได้ในขณะนี้ ดูรายละเอียดที่หน้า <a asp-page="/Health">สถานะระบบ</a>
     </div>
 }
 else if (s is null)
 {
-    <div class="ds-page-header dashboard-header"><div><h1 class="ds-page-title">ภาพรวม</h1></div></div>
     <div class="ds-error" role="alert">ไม่สามารถประกอบข้อมูลภาพรวมได้ กรุณาลองใหม่หรือตรวจสอบหน้า <a asp-page="/Health">สถานะระบบ</a></div>
 }
 else
 {
-    <div class="ds-page-header dashboard-header">
-        <div>
-            <h1 class="ds-page-title">ภาพรวม</h1>
-            <p class="ds-page-subtitle">สถานะคลังเวชภัณฑ์และงานที่ต้องดำเนินการ</p>
-            <p class="ds-page-context dashboard-context">
-                ข้อมูล ณ @s.AsOf.ToString("d MMM yyyy HH:mm") · INV อ่านอย่างเดียว ·
-                <span class="status-dot status-dot-ok" aria-hidden="true"></span> ฐานข้อมูลปกติ
-                @if (s.FailedSectionCount > 0) { <span class="dashboard-context-warn">· @s.FailedSectionCount ส่วนแสดงไม่ได้</span> }
-            </p>
-        </div>
+    @* ---------- utility row: secondary metadata left, FY selector right — no page hero (the shell already names the page) ---------- *@
+    <div class="dashboard-utility">
+        <p class="dashboard-meta">
+            ข้อมูล ณ @s.AsOf.ToString("d MMM yyyy HH:mm")
+            @if (s.FailedSectionCount > 0) { <span class="dashboard-context-warn">· @s.FailedSectionCount ส่วนแสดงไม่ได้</span> }
+        </p>
         <form method="get" class="dashboard-fy" aria-label="เลือกปีงบประมาณ">
             <label for="fy" class="visually-hidden">ปีงบประมาณ</label>
-            <select class="ds-select" id="fy" name="fy" aria-label="ปีงบประมาณ" onchange="this.form.submit()">
+            <select class="ds-select ds-select-sm" id="fy" name="fy" aria-label="ปีงบประมาณ" onchange="this.form.submit()">
                 @foreach (var y in s.FiscalYearOptions)
                 {
                     <option value="@y" selected="@(y == s.FiscalYear)">ปีงบ @y</option>
@@ -62,31 +52,27 @@ else
     </div>
     @if (s.FiscalYearNote is not null) { <p class="ds-warning" role="status">@s.FiscalYearNote</p> }
 
-    @* ---------- A. สิ่งที่ต้องดำเนินการ — first, one action list, no KPI cards ---------- *@
+    @* ---------- A. งานที่ต้องดำเนินการ — one compact panel, one row = one click target ---------- *@
     <section class="dashboard-section dashboard-actions" aria-labelledby="h-actions">
-        <h2 id="h-actions" class="dashboard-section-title">สิ่งที่ต้องดำเนินการ</h2>
-        <div class="dashboard-action-list">
+        <h2 id="h-actions" class="dashboard-section-title">งานที่ต้องดำเนินการ</h2>
+        <div class="dashboard-action-panel">
             @if (s.Reorder is { IsAvailable: true, Value: { } ro })
             {
                 <a class="dashboard-action-row @(ro.RedCount > 0 ? "is-danger" : "is-ok")" asp-page="/Reorder/Index" asp-route-status="red">
                     <span class="dashboard-action-mark" aria-hidden="true"></span>
-                    <span class="dashboard-action-main">
-                        <span class="dashboard-action-title">ต้องสั่งซื้อทันที</span>
-                        <span class="dashboard-action-detail">@ro.RedCount.ToString("N0") รายการ@(ro.RedCount > 0 ? $" · แนะนำสั่งรวม {ro.RedSuggestedTotal:N0} หน่วย" : " · ไม่มีรายการต่ำกว่า MIN")</span>
-                    </span>
-                    <span class="dashboard-action-count">@ro.RedCount.ToString("N0")</span>
-                    <span class="dashboard-action-open">เปิด</span>
+                    <span class="dashboard-action-title">ต้องสั่งซื้อทันที</span>
+                    <span class="dashboard-action-count">@ro.RedCount.ToString("N0") รายการ</span>
+                    <span class="dashboard-action-support">@(ro.RedCount > 0 ? $"แนะนำสั่ง {ro.RedSuggestedTotal:N0} หน่วย" : "ไม่มีรายการต่ำกว่า MIN")</span>
+                    <span class="dashboard-action-chevron" aria-hidden="true">›</span>
                 </a>
                 @if (ro.YellowCount > 0)
                 {
                     <a class="dashboard-action-row is-warning" asp-page="/Reorder/Index" asp-route-status="yellow">
                         <span class="dashboard-action-mark" aria-hidden="true"></span>
-                        <span class="dashboard-action-main">
-                            <span class="dashboard-action-title">ใกล้ถึงจุดสั่งซื้อ</span>
-                            <span class="dashboard-action-detail">@ro.YellowCount.ToString("N0") รายการ</span>
-                        </span>
-                        <span class="dashboard-action-count">@ro.YellowCount.ToString("N0")</span>
-                        <span class="dashboard-action-open">เปิด</span>
+                        <span class="dashboard-action-title">ใกล้ถึงจุดสั่งซื้อ</span>
+                        <span class="dashboard-action-count">@ro.YellowCount.ToString("N0") รายการ</span>
+                        <span class="dashboard-action-support"></span>
+                        <span class="dashboard-action-chevron" aria-hidden="true">›</span>
                     </a>
                 }
             }
@@ -101,12 +87,10 @@ else
                 var activeValue = issued.TotalValue - closed.TotalValue;
                 <a class="dashboard-action-row @(activeCount > 0 ? "is-workflow" : "is-ok")" asp-page="/PurchaseOrders/Index" asp-route-fy="@s.FiscalYear" asp-route-bucket="issued">
                     <span class="dashboard-action-mark" aria-hidden="true"></span>
-                    <span class="dashboard-action-main">
-                        <span class="dashboard-action-title">ใบสั่งซื้อที่ยังดำเนินการ</span>
-                        <span class="dashboard-action-detail">@activeCount.ToString("N0") ใบ · @activeValue.ToString("N2") บาท@(closed.Count > 0 ? $" · เสร็จสิ้นแล้ว {closed.Count:N0} ใบ" : "")</span>
-                    </span>
-                    <span class="dashboard-action-count">@activeCount.ToString("N0")</span>
-                    <span class="dashboard-action-open">เปิด</span>
+                    <span class="dashboard-action-title">ใบสั่งซื้อที่ยังดำเนินการ</span>
+                    <span class="dashboard-action-count">@activeCount.ToString("N0") ใบ</span>
+                    <span class="dashboard-action-support">@activeValue.ToString("N2") บาท@(closed.Count > 0 ? $" · เสร็จสิ้นแล้ว {closed.Count:N0} ใบ" : "")</span>
+                    <span class="dashboard-action-chevron" aria-hidden="true">›</span>
                 </a>
             }
             else { <partial name="_SectionUnavailable" model="@("ใบสั่งซื้อ")" /> }
@@ -115,18 +99,125 @@ else
             {
                 <a class="dashboard-action-row is-warning" asp-page="/Health">
                     <span class="dashboard-action-mark" aria-hidden="true"></span>
-                    <span class="dashboard-action-main">
-                        <span class="dashboard-action-title">ส่วนที่แสดงข้อมูลไม่ได้</span>
-                        <span class="dashboard-action-detail">@s.FailedSectionCount ส่วน · ตรวจสอบสถานะระบบ</span>
-                    </span>
-                    <span class="dashboard-action-count">@s.FailedSectionCount</span>
-                    <span class="dashboard-action-open">เปิด</span>
+                    <span class="dashboard-action-title">ส่วนที่แสดงข้อมูลไม่ได้</span>
+                    <span class="dashboard-action-count">@s.FailedSectionCount ส่วน</span>
+                    <span class="dashboard-action-support">ตรวจสอบสถานะระบบ</span>
+                    <span class="dashboard-action-chevron" aria-hidden="true">›</span>
                 </a>
             }
         </div>
     </section>
 
-    @* ---------- B. ภาพรวมคลัง — one inventory summary (value appears once) + supporting panels ---------- *@
+    @* ---------- B. ความเคลื่อนไหวรายเดือน — main focus: INVC processed months (MNTH_SUM + MBS_RE_M); the header reads as the equation ---------- *@
+    <section class="dashboard-section dashboard-movement" aria-labelledby="h-move">
+        <h2 id="h-move" class="dashboard-section-title">ความเคลื่อนไหวรายเดือน <span class="dashboard-section-note">มูลค่า (บาท) · เดือนที่ประมวลผลแล้ว · ปีงบ @s.FiscalYear</span></h2>
+        @if (s.Movement is { IsAvailable: true, Value: { } pm })
+        {
+            if (pm.Months.Count == 0) { <div class="ds-empty">ยังไม่มีเดือนที่ประมวลผลในปีงบประมาณนี้</div> }
+            else
+            {
+                <div class="ds-list dashboard-movement-list">
+                    <table class="ds-table dashboard-movement-table">
+                        <caption class="visually-hidden">ความเคลื่อนไหวรายเดือน (ประมวลผล) ปีงบ @s.FiscalYear: ยอดยกมา + รับเข้า − จ่ายออก = คงเหลือ</caption>
+                        <thead><tr>
+                            <th scope="col" class="dashboard-col-month">เดือน</th>
+                            <th scope="col" class="ds-col-num">ยอดยกมา</th>
+                            <th scope="col" class="ds-col-num"><span class="dashboard-op" aria-hidden="true">+</span> รับเข้า</th>
+                            <th scope="col" class="ds-col-num"><span class="dashboard-op" aria-hidden="true">−</span> จ่ายออก</th>
+                            <th scope="col" class="ds-col-num"><span class="dashboard-op" aria-hidden="true">=</span> คงเหลือ</th>
+                        </tr></thead>
+                        <tbody>
+                        @{ var first = true; }
+                        @foreach (var m in pm.Months)
+                        {
+                            <tr class="ds-row dashboard-processed-row@(first ? " is-latest" : "")">
+                                <td class="dashboard-month dashboard-col-month">
+                                    <button type="button" class="dashboard-month-toggle" aria-expanded="false" aria-controls="mt-panel-@m.MonthKey">
+                                        <span class="dashboard-month-chevron" aria-hidden="true"></span>
+                                        <span class="dashboard-month-label">@m.DisplayMonth</span>
+                                        <span class="visually-hidden">— แยกหมวดเวชภัณฑ์</span>
+                                    </button>
+                                </td>
+                                <td class="ds-col-num ds-number dashboard-opening">
+                                    @if (m.HasOpening) { @m.OpeningValue!.Value.ToString("N2") }
+                                    else { <span class="dashboard-no-opening" title="ไม่มีข้อมูลสิ้นเดือน @DashboardMonthKey.Display(DashboardMonthKey.Previous(m.MonthKey)) ใน MNTH_SUM">ไม่มียอดสิ้นเดือนก่อนหน้า</span> }
+                                </td>
+                                <td class="ds-col-num ds-number dashboard-receive">@m.ReceiveValue.ToString("N2")</td>
+                                <td class="ds-col-num ds-number dashboard-issue">@m.IssueValue.ToString("N2")</td>
+                                <td class="ds-col-num ds-number dashboard-ending">@m.EndingValue.ToString("N2")</td>
+                            </tr>
+                            <tr class="dashboard-type-row" id="mt-panel-@m.MonthKey" hidden>
+                                <td colspan="5" class="dashboard-type-cell">
+                                    <div class="dashboard-type-panel">
+                                        <table class="dashboard-type-table" aria-label="แยกหมวดเวชภัณฑ์ @m.DisplayMonth">
+                                            <thead><tr><th scope="col">ประเภท</th><th scope="col" class="ds-col-num">ยอดยกมา</th><th scope="col" class="ds-col-num">รับเข้า</th><th scope="col" class="ds-col-num">จ่ายออก</th><th scope="col" class="ds-col-num">คงเหลือ</th></tr></thead>
+                                            <tbody>
+                                                <tr class="is-subtotal">
+                                                    <td>ยา รวม <span class="dashboard-muted">(ED + NED)</span></td>
+                                                    <td class="ds-col-num ds-number">@(m.DrugOpeningValue?.ToString("N2") ?? "–")</td>
+                                                    <td class="ds-col-num ds-number">@m.DrugReceiveValue.ToString("N2")</td>
+                                                    <td class="ds-col-num ds-number">@m.DrugIssueValue.ToString("N2")</td>
+                                                    <td class="ds-col-num ds-number">@m.DrugEndingValue.ToString("N2")</td>
+                                                </tr>
+                                                @foreach (var code in new[] { "1", "2" })
+                                                {
+                                                    var tt = m.Type(code);
+                                                    <tr class="is-child">
+                                                        <td>@(tt?.Name ?? (code == "1" ? "ยาในบัญชียาหลักแห่งชาติ" : "ยานอกบัญชียาหลักแห่งชาติ")) <span class="dashboard-muted">(@(code == "1" ? "ED" : "NED"))</span></td>
+                                                        <td class="ds-col-num ds-number">@(tt?.OpeningValue?.ToString("N2") ?? (m.HasOpening ? "0.00" : "–"))</td>
+                                                        <td class="ds-col-num ds-number">@((tt?.ReceiveValue ?? 0m).ToString("N2"))</td>
+                                                        <td class="ds-col-num ds-number">@((tt?.IssueValue ?? 0m).ToString("N2"))</td>
+                                                        <td class="ds-col-num ds-number">@((tt?.EndingValue ?? 0m).ToString("N2"))</td>
+                                                    </tr>
+                                                }
+                                                @foreach (var tt in m.Types.Where(x => x.Code != "1" && x.Code != "2" && x.HasAnyValue))
+                                                {
+                                                    <tr class="@(tt.IsUnknown ? "is-unknown" : "")">
+                                                        <td>@tt.Name @if (!tt.IsUnknown) { <span class="dashboard-muted">(@tt.Code)</span> }</td>
+                                                        <td class="ds-col-num ds-number">@(tt.OpeningValue?.ToString("N2") ?? "–")</td>
+                                                        <td class="ds-col-num ds-number">@tt.ReceiveValue.ToString("N2")</td>
+                                                        <td class="ds-col-num ds-number">@tt.IssueValue.ToString("N2")</td>
+                                                        <td class="ds-col-num ds-number">@tt.EndingValue.ToString("N2")</td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                            <tfoot><tr>
+                                                <td>รวมทั้งหมด</td>
+                                                <td class="ds-col-num ds-number">@(m.TypeOpeningTotal?.ToString("N2") ?? "–")</td>
+                                                <td class="ds-col-num ds-number">@m.TypeReceiveTotal.ToString("N2")</td>
+                                                <td class="ds-col-num ds-number">@m.TypeIssueTotal.ToString("N2")</td>
+                                                <td class="ds-col-num ds-number">@m.TypeEndingTotal.ToString("N2")</td>
+                                            </tr></tfoot>
+                                        </table>
+                                        @if (m.Difference is { } d && d != 0m) { <p class="dashboard-type-diff" role="status">ส่วนต่างจากผลประมวลผล: @(d > 0 ? "+" : "")@d.ToString("N2") บาท</p> }
+                                        @foreach (var tt in m.Types.Where(x => x.Difference is { } dd && dd != 0m))
+                                        {
+                                            <p class="dashboard-type-diff" role="status">@tt.Name — ส่วนต่างจากผลประมวลผล: @(tt.Difference!.Value > 0 ? "+" : "")@tt.Difference!.Value.ToString("N2") บาท</p>
+                                        }
+                                        @if (!m.TypesMatchTotals) { <p class="dashboard-type-diff" role="status">ยอดแยกหมวดไม่ตรงกับยอดรวมของเดือน</p> }
+                                    </div>
+                                </td>
+                            </tr>
+                            first = false;
+                        }
+                        </tbody>
+                    </table>
+                </div>
+                <details class="ds-help dashboard-movement-detail">
+                    <summary>ที่มาของข้อมูล</summary>
+                    <ul class="mb-0 mt-2">
+                        <li>ยอดยกมา / คงเหลือ = MNTH_SUM (ยอดคงเหลือสิ้นเดือนทุกรายการ) · ยอดยกมาคือค่าคงเหลือของเดือนปฏิทินก่อนหน้า</li>
+                        <li>รับเข้า / จ่ายออก = MBS_RE_M (รายการที่มีการเคลื่อนไหวในเดือนนั้น)</li>
+                        <li>ประเภทเวชภัณฑ์ = ED_NED ที่บันทึกไว้ ณ ตอนประมวลผล → TBLED_NED</li>
+                        <li>แสดงเฉพาะเดือนที่ผ่าน “ประมวลผลรายเดือน” ใน INVC — เดือนที่ยังไม่ประมวลผลจะไม่แสดง</li>
+                    </ul>
+                </details>
+            }
+        }
+        else { <partial name="_SectionUnavailable" model="@("ความเคลื่อนไหวรายเดือน")" /> }
+    </section>
+
+    @* ---------- C. ภาพรวมคลัง — one inventory summary (value appears once) + supporting panels ---------- *@
     <section class="dashboard-section dashboard-stock" aria-labelledby="h-stock">
         <h2 id="h-stock" class="dashboard-section-title">ภาพรวมคลัง <span class="dashboard-section-note">ข้อมูลปัจจุบัน ยกเว้นที่ระบุงวด</span></h2>
         <div class="dashboard-stock-grid">
@@ -203,7 +294,7 @@ else
         </div>
     </section>
 
-    @* ---------- C. การจัดซื้อและการเงิน — budget row, pipeline as THE PO representation, supporting rows ---------- *@
+    @* ---------- D. การจัดซื้อและการเงิน — budget row, pipeline as THE PO representation, supporting rows ---------- *@
     <section class="dashboard-section dashboard-procurement" aria-labelledby="h-proc">
         <h2 id="h-proc" class="dashboard-section-title">การจัดซื้อและการเงิน <span class="dashboard-section-note">ปีงบ @s.FiscalYear</span></h2>
 
@@ -285,121 +376,6 @@ else
         </div>
     </section>
 
-    @* ---------- D. ความเคลื่อนไหวรายเดือน ---------- *@
-    <section class="dashboard-section dashboard-movement" aria-labelledby="h-move">
-        <h2 id="h-move" class="dashboard-section-title">ความเคลื่อนไหวรายเดือน <span class="dashboard-section-note">ปีงบ @s.FiscalYear · มูลค่า (บาท)</span></h2>
-        @if (s.Movement is { IsAvailable: true, Value: { } mv })
-        {
-            if (mv.Count == 0) { <div class="ds-empty">ไม่มีความเคลื่อนไหวในปีงบประมาณนี้</div> }
-            else
-            {
-                var hasOther = mv.Any(m => m.OtherValue != 0);
-                var maxFlow = mv.Max(m => Math.Max(m.ReceiveValue, m.IssueValue));
-                <div class="ds-list dashboard-movement-list">
-                    <table class="ds-table dashboard-movement-table">
-                        <caption class="visually-hidden">ความเคลื่อนไหวรายเดือน ปีงบ @s.FiscalYear</caption>
-                        <thead><tr>
-                            <th scope="col">เดือน</th>
-                            <th scope="col" class="ds-col-num">รับเข้า</th>
-                            <th scope="col" class="dashboard-bar-col" aria-hidden="true"></th>
-                            <th scope="col" class="ds-col-num">จ่ายออก</th>
-                            <th scope="col" class="dashboard-bar-col" aria-hidden="true"></th>
-                            @if (hasOther) { <th scope="col" class="ds-col-num">อื่น ๆ</th> }
-                            <th scope="col" class="ds-col-num">รายการ</th>
-                        </tr></thead>
-                        <tbody>
-                        @{ var colCount = hasOther ? 7 : 6; }
-                        @foreach (var m in mv)
-                        {
-                            <tr class="ds-row">
-                                <td class="dashboard-month">
-                                    @m.DisplayMonth
-                                    @if (m.ItemTypes.Count > 0)
-                                    {
-                                        <label class="dashboard-type-toggle" for="mt-@m.MonthKey">ดูแยกหมวดเวชภัณฑ์ <span aria-hidden="true">▾</span></label>
-                                    }
-                                </td>
-                                <td class="ds-col-num ds-number">@m.ReceiveValue.ToString("N2")</td>
-                                <td class="dashboard-bar-col" aria-hidden="true"><span class="dashboard-bar dashboard-bar--in" style="width:@(maxFlow > 0 ? (100m * m.ReceiveValue / maxFlow).ToString("N0") : "0")%"></span></td>
-                                <td class="ds-col-num ds-number">@m.IssueValue.ToString("N2")</td>
-                                <td class="dashboard-bar-col" aria-hidden="true"><span class="dashboard-bar dashboard-bar--out" style="width:@(maxFlow > 0 ? (100m * m.IssueValue / maxFlow).ToString("N0") : "0")%"></span></td>
-                                @if (hasOther) { <td class="ds-col-num ds-number">@m.OtherValue.ToString("N2")</td> }
-                                <td class="ds-col-num ds-number">@m.Count.ToString("N0")</td>
-                            </tr>
-                            @if (m.ItemTypes.Count > 0)
-                            {
-                                @* item-type breakdown of THIS month (CARD → INV_MD.ED_NED → TBLED_NED); CSS-only expander, no script *@
-                                <tr class="dashboard-type-row">
-                                    <td colspan="@colCount" class="dashboard-type-cell">
-                                        <input type="checkbox" id="mt-@m.MonthKey" class="dashboard-type-check" />
-                                        <div class="dashboard-type-panel" id="mt-panel-@m.MonthKey">
-                                            <table class="dashboard-type-table" aria-label="แยกหมวดเวชภัณฑ์ @m.DisplayMonth">
-                                                <thead><tr><th scope="col">หมวดเวชภัณฑ์</th><th scope="col" class="ds-col-num">รับเข้า</th><th scope="col" class="ds-col-num">จ่ายออก</th>@if (hasOther) { <th scope="col" class="ds-col-num">อื่น ๆ</th> }</tr></thead>
-                                                <tbody>
-                                                    <tr class="is-subtotal">
-                                                        <td>ยา รวม <span class="dashboard-muted">(ED + NED)</span></td>
-                                                        <td class="ds-col-num ds-number">@m.DrugReceiveValue.ToString("N2")</td>
-                                                        <td class="ds-col-num ds-number">@m.DrugIssueValue.ToString("N2")</td>
-                                                        @if (hasOther) { <td class="ds-col-num ds-number">@m.DrugOtherValue.ToString("N2")</td> }
-                                                    </tr>
-                                                    @foreach (var code in new[] { "1", "2" })
-                                                    {
-                                                        var tt = m.Type(code);
-                                                        <tr class="is-child">
-                                                            <td>@(tt?.Name ?? (code == "1" ? "ยาในบัญชียาหลักแห่งชาติ" : "ยานอกบัญชียาหลักแห่งชาติ")) <span class="dashboard-muted">(@(code == "1" ? "ED" : "NED"))</span></td>
-                                                            <td class="ds-col-num ds-number">@((tt?.ReceiveValue ?? 0m).ToString("N2"))</td>
-                                                            <td class="ds-col-num ds-number">@((tt?.IssueValue ?? 0m).ToString("N2"))</td>
-                                                            @if (hasOther) { <td class="ds-col-num ds-number">@((tt?.OtherValue ?? 0m).ToString("N2"))</td> }
-                                                        </tr>
-                                                    }
-                                                    @foreach (var tt in m.ItemTypes.Where(x => x.Code != "1" && x.Code != "2" && (x.HasValue || !x.IsUnknown)))
-                                                    {
-                                                        <tr class="@(tt.IsUnknown ? "is-unknown" : "")">
-                                                            <td>@tt.Name @if (!tt.IsUnknown) { <span class="dashboard-muted">(@tt.Code)</span> }</td>
-                                                            <td class="ds-col-num ds-number">@tt.ReceiveValue.ToString("N2")</td>
-                                                            <td class="ds-col-num ds-number">@tt.IssueValue.ToString("N2")</td>
-                                                            @if (hasOther) { <td class="ds-col-num ds-number">@tt.OtherValue.ToString("N2")</td> }
-                                                        </tr>
-                                                    }
-                                                </tbody>
-                                                <tfoot><tr>
-                                                    <td>รวม</td>
-                                                    <td class="ds-col-num ds-number">@m.TypeReceiveTotal.ToString("N2")</td>
-                                                    <td class="ds-col-num ds-number">@m.TypeIssueTotal.ToString("N2")</td>
-                                                    @if (hasOther) { <td class="ds-col-num ds-number">@m.TypeOtherTotal.ToString("N2")</td> }
-                                                </tr></tfoot>
-                                            </table>
-                                            @if (!m.TypesMatchTotals) { <p class="dashboard-type-warn" role="status">ยอดแยกหมวดไม่ตรงกับยอดรวมของเดือน</p> }
-                                        </div>
-                                    </td>
-                                </tr>
-                            }
-                        }
-                        </tbody>
-                        <tfoot><tr>
-                            <td>รวม</td>
-                            <td class="ds-col-num ds-number">@mv.Sum(m => m.ReceiveValue).ToString("N2")</td><td></td>
-                            <td class="ds-col-num ds-number">@mv.Sum(m => m.IssueValue).ToString("N2")</td><td></td>
-                            @if (hasOther) { <td class="ds-col-num ds-number">@mv.Sum(m => m.OtherValue).ToString("N2")</td> }
-                            <td class="ds-col-num ds-number">@mv.Sum(m => m.Count).ToString("N0")</td>
-                        </tr></tfoot>
-                    </table>
-                </div>
-                <details class="ds-help dashboard-movement-detail">
-                    <summary>ดูประเภทรายการเคลื่อนไหว (RO / RS / SS / SO)</summary>
-                    <ul class="mb-0 mt-2">
-                        <li>รหัสประเภท = R_S_STATUS + อักษรแรกของเลขที่เอกสาร (RO รับจากใบรับอื่น, RS รับคืนจากคลังย่อย, SS จ่ายให้คลังย่อย, SO จ่ายออกอื่น) — รวมทุกประเภทตามระบบเดิม</li>
-                        @foreach (var m in mv)
-                        {
-                            <li><span class="ds-tabular">@m.DisplayMonth</span>: @string.Join(" · ", m.Categories.Select(c => $"{c.Category.Key} {c.Count} ({c.Category.ThaiLabel})"))</li>
-                        }
-                    </ul>
-                </details>
-            }
-        }
-        else { <partial name="_SectionUnavailable" model="@("ความเคลื่อนไหวรายเดือน")" /> }
-    </section>
-
     @* ---------- E. ประวัติการจ่ายรายการยา — secondary analytical tool ---------- *@
     <section class="dashboard-section dashboard-trend" aria-labelledby="h-item">
         <h2 id="h-item" class="dashboard-section-title">ประวัติการจ่ายรายการยา <span class="dashboard-section-note">12 เดือนล่าสุด</span></h2>
@@ -427,7 +403,7 @@ else
                         @foreach (var m in tr.Months)
                         {
                             <tr class="ds-row">
-                                <td class="dashboard-month">@(new DashboardMovementMonth(m.MonthKey, []).DisplayMonth)</td>
+                                <td class="dashboard-month">@DashboardMonthKey.Display(m.MonthKey)</td>
                                 <td class="ds-col-num ds-number">@m.SaleQuantity.ToString("N0")</td>
                                 <td class="ds-col-num ds-number">@m.SaleValue.ToString("N2")</td>
                                 <td class="dashboard-bar-col dashboard-bar-col--wide" aria-hidden="true"><span class="dashboard-bar dashboard-bar--out" style="width:@(max > 0 ? (100m * m.SaleQuantity / max).ToString("N0") : "0")%"></span></td>
@@ -443,3 +419,7 @@ else
     </section>
 }
 </div>
+
+@section Scripts {
+    <script src="~/js/dashboard-movement.js" asp-append-version="true"></script>
+}

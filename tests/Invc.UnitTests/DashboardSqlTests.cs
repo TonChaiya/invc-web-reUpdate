@@ -9,7 +9,7 @@ public class DashboardSqlTests
     public void Every_dashboard_statement_passes_the_read_only_guard_and_stays_in_its_lane()
     {
         var all = DashboardSql.AllStatements().ToList();
-        Assert.Equal(10, all.Count);
+        Assert.Equal(10, all.Count);   // Budget, Substock, StockCoverage, LegacyEdNed, ActiveAgreements, ProcessedSnapshots, ProcessedFlows, ProcessTime, ItemHeader, ItemTrend
         foreach (var sql in all)
         {
             Assert.Equal(sql, ReadOnlySql.Ensure(sql));
@@ -19,26 +19,33 @@ public class DashboardSqlTests
             Assert.DoesNotContain("MIN_LEVEL", sql, StringComparison.OrdinalIgnoreCase);     // reorder rules come from the Reorder module
         }
         Assert.DoesNotContain("STATUS", DashboardSql.ProcessTime, StringComparison.Ordinal);  // no PO bucket sets in SQL
-        Assert.Contains("WHERE c.OPERATE_DATE >= @From AND c.OPERATE_DATE < @To", DashboardSql.Movement, StringComparison.Ordinal);
+        Assert.Contains("WHERE c.WORKING_CODE = @WorkingCode", DashboardSql.ItemTrend, StringComparison.Ordinal);   // CARD stays the per-item trend source only
         Assert.Contains("m.NOUSE IS NULL AND m.OUT_OF_LIST IS NULL AND m.PO_INDIVIDUAL IS NULL", DashboardSql.LegacyEdNed, StringComparison.Ordinal);
         Assert.Contains("a.BuyQty < a.AgreeQty AND a.Expdate > @Today", DashboardSql.ActiveAgreements, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Movement_by_item_type_keeps_card_as_source_and_classifies_through_inv_md_ed_ned_and_tbled_ned_safely()
+    public void Processed_monthly_statements_use_mnth_sum_and_mbs_re_m_with_historical_ed_ned_and_never_card_or_mbs_re_y()
     {
-        var sql = DashboardSql.MovementByItemType;
-        Assert.Equal(sql, ReadOnlySql.Ensure(sql));
-        Assert.Contains("FROM dbo.CARD c", sql, StringComparison.Ordinal);
-        Assert.Contains("WHERE c.OPERATE_DATE >= @From AND c.OPERATE_DATE < @To", sql, StringComparison.Ordinal);   // same window as D9
-        // classification path: CARD.WORKING_CODE → INV_MD.ED_NED → TBLED_NED (EDCODE/EDNAME); deterministic TOP 1 lookups, no row-multiplying JOIN
-        Assert.Contains("OUTER APPLY (SELECT TOP 1 RTRIM(m.ED_NED) AS ItemTypeCode FROM dbo.INV_MD m WHERE m.WORKING_CODE = c.WORKING_CODE ORDER BY m.RECORD_NUMBER) md", sql, StringComparison.Ordinal);
-        Assert.Contains("OUTER APPLY (SELECT TOP 1 RTRIM(x.EDNAME) AS ItemTypeName FROM dbo.TBLED_NED x WHERE x.EDCODE = md.ItemTypeCode ORDER BY x.EDCODE) t", sql, StringComparison.Ordinal);
-        Assert.DoesNotContain(" JOIN ", sql, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("LOCATION", sql, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("GROUP_CODE", sql, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("SUPPLY_TYPE", sql, StringComparison.OrdinalIgnoreCase);
-        // the same grouping keys as D9 plus the type, so per-month type sums re-add to the D9 totals
-        Assert.Contains("GROUP BY YEAR(c.OPERATE_DATE), MONTH(c.OPERATE_DATE), c.R_S_STATUS, LEFT(c.R_S_NUMBER, 1), md.ItemTypeCode, t.ItemTypeName", sql, StringComparison.Ordinal);
+        var snap = DashboardSql.ProcessedSnapshots; var flow = DashboardSql.ProcessedFlows;
+        foreach (var sql in new[] { snap, flow })
+        {
+            Assert.Equal(sql, ReadOnlySql.Ensure(sql));
+            Assert.DoesNotContain("MBS_RE_Y", sql, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("INV_MD", sql, StringComparison.OrdinalIgnoreCase);        // historical ED_NED, not today's classification
+            Assert.DoesNotContain("CARD", sql, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("REMAIN_", sql, StringComparison.OrdinalIgnoreCase);       // MBS_RE_M.REMAIN_* is not the store total
+            Assert.Contains("OUTER APPLY (SELECT TOP 1 RTRIM(x.EDNAME) AS EdNedName FROM dbo.TBLED_NED x", sql, StringComparison.Ordinal);
+            Assert.Contains("RIGHT('0' + RTRIM(", sql, StringComparison.Ordinal);            // CE yyyymm text keys, zero-padded month
+            Assert.Contains(">= @FromKey", sql); Assert.Contains("<= @ToKey", sql);
+            Assert.DoesNotContain(" JOIN ", sql, StringComparison.OrdinalIgnoreCase);
+        }
+        Assert.Contains("FROM dbo.MNTH_SUM s", snap); Assert.Contains("SUM(s.QTY_REMAIN)", snap); Assert.Contains("SUM(s.TOTAL_VALUE)", snap); Assert.Contains("RTRIM(s.ED_NED) AS EdNed", snap);
+        Assert.Contains("FROM dbo.MBS_RE_M m", flow); Assert.Contains("SUM(m.RCV_VALUE)", flow); Assert.Contains("SUM(m.SALE_VALUE)", flow); Assert.Contains("RTRIM(m.ED_NED) AS EdNed", flow);
+        // CARD no longer owns the monthly summary: no dashboard statement groups CARD by month except the per-item trend
+        foreach (var sql in DashboardSql.AllStatements().Where(x => x.Contains("dbo.CARD", StringComparison.OrdinalIgnoreCase)))
+        {
+            Assert.Contains("@WorkingCode", sql);
+        }
     }
 }

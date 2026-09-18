@@ -54,40 +54,47 @@ internal static class DashboardSql
         WHERE a.BuyQty < a.AgreeQty AND a.Expdate > @Today
         """;
 
-    /// <summary>D9 — table_monthly_rpt.asp: CARD grouped by Thai month and R_S_STATUS + LEFT(R_S_NUMBER,1) for the FY window.</summary>
-    public const string Movement = """
-        SELECT CAST(YEAR(c.OPERATE_DATE) + 543 AS varchar(4)) + RIGHT('0' + CAST(MONTH(c.OPERATE_DATE) AS varchar(2)), 2) AS MonthKey,
-               c.R_S_STATUS AS Status,
-               LEFT(c.R_S_NUMBER, 1) AS NumberPrefix,
-               COUNT(*) AS [Count],
-               ISNULL(SUM(c.[VALUE]), 0) AS Value,
-               ISNULL(SUM(ISNULL(c.ACTIVE_QTY1, 0) + ISNULL(c.ACTIVE_QTY2, 0) + ISNULL(c.ACTIVE_QTY3, 0)), 0) AS Quantity
-        FROM dbo.CARD c
-        WHERE c.OPERATE_DATE >= @From AND c.OPERATE_DATE < @To
-        GROUP BY YEAR(c.OPERATE_DATE), MONTH(c.OPERATE_DATE), c.R_S_STATUS, LEFT(c.R_S_NUMBER, 1)
-        ORDER BY YEAR(c.OPERATE_DATE) DESC, MONTH(c.OPERATE_DATE) DESC, c.R_S_STATUS, LEFT(c.R_S_NUMBER, 1)
+    /// <summary>
+    /// Processed monthly report (2026-09-18, replaces the CARD-based D9 summary): MNTH_SUM = complete end-of-month snapshot
+    /// (QTY_REMAIN / TOTAL_VALUE), keyed by CE YEAR + 2-char MONTH, aggregated by the HISTORICAL ED_NED recorded at processing
+    /// time (name from TBLED_NED via OUTER APPLY TOP 1). The window is passed as Buddhist-free CE 'yyyymm' text keys and covers the
+    /// fiscal year plus the immediately preceding calendar month (opening source of the first FY month only).
+    /// Live audit: (YEAR, MONTH, WORKING_CODE) is unique in both tables; MBS_RE_M.REMAIN_* is never read (movement-only rows).
+    /// MBS_RE_Y is deliberately unused (only one year exists, totals do not reconcile — UNRESOLVED).
+    /// </summary>
+    public const string ProcessedSnapshots = """
+        SELECT CAST(RTRIM(s.YEAR) AS int) AS Year,
+               CAST(RTRIM(s.MONTH) AS int) AS Month,
+               RTRIM(s.ED_NED) AS EdNed,
+               t.EdNedName,
+               COUNT(*) AS ItemCount,
+               ISNULL(SUM(s.QTY_REMAIN), 0) AS QtyRemain,
+               ISNULL(SUM(s.TOTAL_VALUE), 0) AS TotalValue
+        FROM dbo.MNTH_SUM s
+        OUTER APPLY (SELECT TOP 1 RTRIM(x.EDNAME) AS EdNedName FROM dbo.TBLED_NED x WHERE RTRIM(x.EDCODE) = RTRIM(s.ED_NED) ORDER BY x.EDCODE) t
+        WHERE RTRIM(s.YEAR) + RIGHT('0' + RTRIM(s.MONTH), 2) >= @FromKey
+          AND RTRIM(s.YEAR) + RIGHT('0' + RTRIM(s.MONTH), 2) <= @ToKey
+        GROUP BY RTRIM(s.YEAR), RTRIM(s.MONTH), RTRIM(s.ED_NED), t.EdNedName
+        ORDER BY RTRIM(s.YEAR) DESC, RTRIM(s.MONTH) DESC, RTRIM(s.ED_NED)
         """;
 
-    /// <summary>
-    /// D9 by item type (2026-09-18): the same CARD window grouped additionally by INV_MD.ED_NED → TBLED_NED. Lookups are
-    /// OUTER APPLY TOP 1 (deterministic, never multiply CARD rows; audit FY2569: 1958 = 1958 rows); rows whose item or type
-    /// cannot be resolved keep a NULL type and are surfaced as "ไม่ระบุประเภท" in Core. No LOCATION / GROUP_CODE involved.
-    /// </summary>
-    public const string MovementByItemType = """
-        SELECT CAST(YEAR(c.OPERATE_DATE) + 543 AS varchar(4)) + RIGHT('0' + CAST(MONTH(c.OPERATE_DATE) AS varchar(2)), 2) AS MonthKey,
-               c.R_S_STATUS AS Status,
-               LEFT(c.R_S_NUMBER, 1) AS NumberPrefix,
-               md.ItemTypeCode,
-               t.ItemTypeName,
-               COUNT(*) AS [Count],
-               ISNULL(SUM(c.[VALUE]), 0) AS Value,
-               ISNULL(SUM(ISNULL(c.ACTIVE_QTY1, 0) + ISNULL(c.ACTIVE_QTY2, 0) + ISNULL(c.ACTIVE_QTY3, 0)), 0) AS Quantity
-        FROM dbo.CARD c
-        OUTER APPLY (SELECT TOP 1 RTRIM(m.ED_NED) AS ItemTypeCode FROM dbo.INV_MD m WHERE m.WORKING_CODE = c.WORKING_CODE ORDER BY m.RECORD_NUMBER) md
-        OUTER APPLY (SELECT TOP 1 RTRIM(x.EDNAME) AS ItemTypeName FROM dbo.TBLED_NED x WHERE x.EDCODE = md.ItemTypeCode ORDER BY x.EDCODE) t
-        WHERE c.OPERATE_DATE >= @From AND c.OPERATE_DATE < @To
-        GROUP BY YEAR(c.OPERATE_DATE), MONTH(c.OPERATE_DATE), c.R_S_STATUS, LEFT(c.R_S_NUMBER, 1), md.ItemTypeCode, t.ItemTypeName
-        ORDER BY YEAR(c.OPERATE_DATE) DESC, MONTH(c.OPERATE_DATE) DESC, md.ItemTypeCode, c.R_S_STATUS, LEFT(c.R_S_NUMBER, 1)
+    /// <summary>MBS_RE_M monthly receive / issue flow per (YEAR, MONTH, historical ED_NED) for the fiscal year window.</summary>
+    public const string ProcessedFlows = """
+        SELECT CAST(RTRIM(m.YEAR) AS int) AS Year,
+               CAST(RTRIM(m.MONTH) AS int) AS Month,
+               RTRIM(m.ED_NED) AS EdNed,
+               t.EdNedName,
+               COUNT(*) AS ItemCount,
+               ISNULL(SUM(m.RCV_QUAN), 0) AS RcvQuan,
+               ISNULL(SUM(m.RCV_VALUE), 0) AS RcvValue,
+               ISNULL(SUM(m.SALE_QUAN), 0) AS SaleQuan,
+               ISNULL(SUM(m.SALE_VALUE), 0) AS SaleValue
+        FROM dbo.MBS_RE_M m
+        OUTER APPLY (SELECT TOP 1 RTRIM(x.EDNAME) AS EdNedName FROM dbo.TBLED_NED x WHERE RTRIM(x.EDCODE) = RTRIM(m.ED_NED) ORDER BY x.EDCODE) t
+        WHERE RTRIM(m.YEAR) + RIGHT('0' + RTRIM(m.MONTH), 2) >= @FromKey
+          AND RTRIM(m.YEAR) + RIGHT('0' + RTRIM(m.MONTH), 2) <= @ToKey
+        GROUP BY RTRIM(m.YEAR), RTRIM(m.MONTH), RTRIM(m.ED_NED), t.EdNedName
+        ORDER BY RTRIM(m.YEAR) DESC, RTRIM(m.MONTH) DESC, RTRIM(m.ED_NED)
         """;
 
     /// <summary>C11 — Dashboard.asp / ipiss_process.asp process time per PO month (fiscal year by PO_NO prefix, as Phase 4).</summary>
@@ -123,7 +130,7 @@ internal static class DashboardSql
     public static IEnumerable<string> AllStatements()
     {
         yield return Budget; yield return Substock; yield return StockCoverage; yield return LegacyEdNed;
-        yield return ActiveAgreements; yield return Movement; yield return MovementByItemType; yield return ProcessTime; yield return ItemHeader; yield return ItemTrend;
+        yield return ActiveAgreements; yield return ProcessedSnapshots; yield return ProcessedFlows; yield return ProcessTime; yield return ItemHeader; yield return ItemTrend;
     }
 }
 
@@ -163,18 +170,30 @@ public sealed class DashboardAnalyticsRepository(ISqlConnectionFactory connectio
         return (await c.QueryAsync<DashboardAgreementRow>(Cmd(DashboardSql.ActiveAgreements, new { Today = today }, ct)).ConfigureAwait(false)).AsList();
     }
 
-    public async Task<IReadOnlyList<DashboardMovementRow>> GetMovementAsync(int fiscalYear, CancellationToken ct = default)
+    public async Task<IReadOnlyList<DashboardProcessedSnapshotRow>> GetProcessedSnapshotsAsync(int fiscalYear, CancellationToken ct = default)
     {
-        var (from, to) = NonPoReceiptRepository.FiscalYearWindow(fiscalYear);
+        var (fromKey, toKey) = ProcessedWindow(fiscalYear, includePrecedingMonth: true);
         await using var c = await connections.OpenAsync(ct).ConfigureAwait(false);
-        return (await c.QueryAsync<DashboardMovementRow>(Cmd(DashboardSql.Movement, new { From = from, To = to }, ct)).ConfigureAwait(false)).AsList();
+        return (await c.QueryAsync<DashboardProcessedSnapshotRow>(Cmd(DashboardSql.ProcessedSnapshots, new { FromKey = fromKey, ToKey = toKey }, ct)).ConfigureAwait(false)).AsList();
     }
 
-    public async Task<IReadOnlyList<DashboardMovementItemTypeRow>> GetMovementByItemTypeAsync(int fiscalYear, CancellationToken ct = default)
+    public async Task<IReadOnlyList<DashboardProcessedFlowRow>> GetProcessedFlowsAsync(int fiscalYear, CancellationToken ct = default)
     {
-        var (from, to) = NonPoReceiptRepository.FiscalYearWindow(fiscalYear);
+        var (fromKey, toKey) = ProcessedWindow(fiscalYear, includePrecedingMonth: false);
         await using var c = await connections.OpenAsync(ct).ConfigureAwait(false);
-        return (await c.QueryAsync<DashboardMovementItemTypeRow>(Cmd(DashboardSql.MovementByItemType, new { From = from, To = to }, ct)).ConfigureAwait(false)).AsList();
+        return (await c.QueryAsync<DashboardProcessedFlowRow>(Cmd(DashboardSql.ProcessedFlows, new { FromKey = fromKey, ToKey = toKey }, ct)).ConfigureAwait(false)).AsList();
+    }
+
+    /// <summary>
+    /// CE 'yyyymm' text window for a Thai fiscal year: Oct (FY−544) … Sep (FY−543); with the preceding month, from Sep (FY−544).
+    /// MNTH_SUM / MBS_RE_M store CE years, so the Buddhist FY is converted here — never treated as a Buddhist YEAR column.
+    /// </summary>
+    internal static (string FromKey, string ToKey) ProcessedWindow(int buddhistFiscalYear, bool includePrecedingMonth)
+    {
+        var ceStart = buddhistFiscalYear - Core.Common.ThaiFiscalYear.BuddhistEraOffset - 1;
+        var from = includePrecedingMonth ? $"{ceStart}09" : $"{ceStart}10";
+        var to = $"{ceStart + 1}09";
+        return (from, to);
     }
 
     public async Task<IReadOnlyList<DashboardProcessTimeRow>> GetProcessTimeAsync(int fiscalYear, CancellationToken ct = default)

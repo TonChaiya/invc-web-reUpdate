@@ -97,16 +97,17 @@ public sealed class DashboardPageUiTests : IClassFixture<DashboardPageUiTests.Fa
         public Task<DashboardStockCoverage> GetStockCoverageAsync(CancellationToken ct = default) => Task.FromResult(new DashboardStockCoverage("2026", "08", 262_000m, 100_000m));
         public Task<IReadOnlyList<DashboardEdNedRow>> GetLegacyEdNedAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<DashboardEdNedRow>>([new("1", "ยาในบัญชียาหลักแห่งชาติ", "ED", 173, 90_000m), new("2", "ยานอกบัญชียาหลักแห่งชาติ", "NED", 8, 4_000m), new("3", "วัสดุการแพทย์", "MES", 86, 10_000m)]);
         public Task<IReadOnlyList<DashboardAgreementRow>> GetActiveAgreementsAsync(DateTime today, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<DashboardAgreementRow>>([new(100, 40, 1, 25m)]);
-        public Task<IReadOnlyList<DashboardMovementRow>> GetMovementAsync(int fy, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<DashboardMovementRow>>(
+        // processed months: Sep 2025 (opening source only), Oct 2025, Nov 2025 — Dec onward not processed
+        public Task<IReadOnlyList<DashboardProcessedSnapshotRow>> GetProcessedSnapshotsAsync(int fy, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<DashboardProcessedSnapshotRow>>(
         [
-            new("256810", "R", "O", 3, 12_000m, 300), new("256810", "S", "S", 10, 9_000m, 900),
-            new("256811", "R", "O", 1, 4_000m, 100), new("256811", "S", "O", 4, 2_500m, 250),
+            new(2025, 9, "1", "ยาในบัญชียาหลักแห่งชาติ", 200, 100_000, 70_000m), new(2025, 9, "3", "วัสดุการแพทย์", 80, 8_000, 20_000m),
+            new(2025, 10, "1", "ยาในบัญชียาหลักแห่งชาติ", 200, 101_000, 73_000m), new(2025, 10, "2", "ยานอกบัญชียาหลักแห่งชาติ", 5, 500, 1_500m), new(2025, 10, "3", "วัสดุการแพทย์", 80, 8_100, 21_000m),
+            new(2025, 11, "1", "ยาในบัญชียาหลักแห่งชาติ", 200, 99_000, 69_000m), new(2025, 11, "2", "ยานอกบัญชียาหลักแห่งชาติ", 5, 400, 1_200m), new(2025, 11, "3", "วัสดุการแพทย์", 80, 8_000, 20_500m),
         ]);
-        public Task<IReadOnlyList<DashboardMovementItemTypeRow>> GetMovementByItemTypeAsync(int fy, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<DashboardMovementItemTypeRow>>(
+        public Task<IReadOnlyList<DashboardProcessedFlowRow>> GetProcessedFlowsAsync(int fy, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<DashboardProcessedFlowRow>>(
         [
-            new("256810", "R", "O", "1", "ยาในบัญชียาหลักแห่งชาติ", 2, 9_000m, 200), new("256810", "R", "O", "3", "วัสดุการแพทย์", 1, 3_000m, 100),
-            new("256810", "S", "S", "1", "ยาในบัญชียาหลักแห่งชาติ", 8, 7_500m, 700), new("256810", "S", "S", "2", "ยานอกบัญชียาหลักแห่งชาติ", 2, 1_500m, 200),
-            new("256811", "R", "O", "1", "ยาในบัญชียาหลักแห่งชาติ", 1, 4_000m, 100), new("256811", "S", "O", "3", "วัสดุการแพทย์", 4, 2_500m, 250),
+            new(2025, 10, "1", "ยาในบัญชียาหลักแห่งชาติ", 20, 5_000, 12_000m, 4_000, 9_000m), new(2025, 10, "2", "ยานอกบัญชียาหลักแห่งชาติ", 2, 500, 1_500m, 0, 0m), new(2025, 10, "3", "วัสดุการแพทย์", 5, 300, 3_000m, 200, 2_000m),
+            new(2025, 11, "1", "ยาในบัญชียาหลักแห่งชาติ", 15, 1_000, 2_000m, 3_000, 6_000m), new(2025, 11, "2", "ยานอกบัญชียาหลักแห่งชาติ", 1, 0, 0m, 100, 300m), new(2025, 11, "3", "วัสดุการแพทย์", 3, 0, 0m, 100, 500m),
         ]);
         public Task<IReadOnlyList<DashboardProcessTimeRow>> GetProcessTimeAsync(int fy, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<DashboardProcessTimeRow>>([]);
         public Task<DashboardItemTrend?> GetItemTrendAsync(string code, int months, CancellationToken ct = default)
@@ -126,32 +127,47 @@ public sealed class DashboardPageUiTests : IClassFixture<DashboardPageUiTests.Fa
     private static string Text(string fragment) => Regex.Replace(Regex.Replace(fragment, "<[^>]+>", " "), @"\s+", " ").Trim();
 
     [Fact]
-    public async Task Actions_come_first_with_urgent_reorder_on_top_and_no_kpi_card_wall()
+    public async Task No_page_hero_actions_are_one_compact_panel_with_one_click_target_per_row()
     {
         _factory.AnalyticsFail = false;
         var (code, html) = await GetAsync("/?fy=2569");
         Assert.Equal(HttpStatusCode.OK, code);
-        Assert.Contains("class=\"ds-page-title\">ภาพรวม</h1>", html);
+        // no page hero: the shell already names the page; the h1 is only for assistive tech
+        Assert.DoesNotContain("ds-page-title", html);
+        Assert.DoesNotContain("ds-page-header", html);
+        Assert.DoesNotContain("สถานะคลังเวชภัณฑ์และงานที่ต้องดำเนินการ", html);
+        Assert.DoesNotContain("INV อ่านอย่างเดียว", html);
+        Assert.DoesNotContain("ฐานข้อมูลปกติ", html);
+        Assert.Contains("<h1 class=\"visually-hidden\">ภาพรวม</h1>", html);
+        Assert.Contains("class=\"dashboard-utility\"", html);
         Assert.DoesNotContain("INVC Dashboard", html);
         Assert.DoesNotContain("metric-card", Regex.Replace(html, "<!--.*?-->", ""));
         Assert.DoesNotContain("class=\"card", html);
         Assert.DoesNotContain("table-responsive", html);
-        Assert.Single(Regex.Matches(html, "<select class=\"ds-select\" id=\"fy\" name=\"fy\""));
+        Assert.Single(Regex.Matches(html, "<select class=\"ds-select ds-select-sm\" id=\"fy\" name=\"fy\""));
 
         var actions = Regex.Match(html, "<section class=\"dashboard-section dashboard-actions\".*?</section>", RegexOptions.Singleline);
         Assert.True(actions.Success);
+        var move = html.IndexOf("dashboard-section dashboard-movement", StringComparison.Ordinal);
         var stock = html.IndexOf("dashboard-section dashboard-stock", StringComparison.Ordinal);
-        Assert.True(actions.Index < stock, "actions must precede the stock overview");
+        Assert.True(actions.Index < move && move < stock, "actions → monthly movement → stock overview");
+        Assert.Contains("<h2 id=\"h-actions\" class=\"dashboard-section-title\">งานที่ต้องดำเนินการ</h2>", actions.Value);
+        Assert.Single(Regex.Matches(actions.Value, "class=\"dashboard-action-panel\""));
+        Assert.DoesNotContain("dashboard-action-open", actions.Value);
+        Assert.DoesNotContain("เปิด</", actions.Value);
         var rows = Regex.Matches(actions.Value, "<a class=\"dashboard-action-row ([^\"]+)\"[^>]*href=\"([^\"]+)\"[^>]*>(.*?)</a>", RegexOptions.Singleline);
         Assert.True(rows.Count >= 2);
+        // one click target per concept: each href appears exactly once in the panel
+        Assert.Single(Regex.Matches(actions.Value, "href=\"/Reorder\\?status=red\""));
+        Assert.Single(Regex.Matches(actions.Value, "href=\"/PurchaseOrders\\?fy=2569&bucket=issued\""));
         Assert.Equal("is-danger", rows[0].Groups[1].Value);
         Assert.Contains("/Reorder?status=red", rows[0].Groups[2].Value);
-        Assert.Contains("ต้องสั่งซื้อทันที 2 รายการ · แนะนำสั่งรวม 500 หน่วย 2 เปิด", Text(rows[0].Groups[3].Value));
+        Assert.Equal("ต้องสั่งซื้อทันที 2 รายการ แนะนำสั่ง 500 หน่วย ›", Text(rows[0].Groups[3].Value));
         Assert.Equal("is-warning", rows[1].Groups[1].Value);
         Assert.Contains("ใกล้ถึงจุดสั่งซื้อ 1 รายการ", Text(rows[1].Groups[3].Value));
         var poRow = rows.Cast<Match>().Single(m => m.Groups[2].Value.Contains("/PurchaseOrders"));
         Assert.Equal("is-workflow", poRow.Groups[1].Value);
-        Assert.Contains("ใบสั่งซื้อที่ยังดำเนินการ 1 ใบ · 1,790.00 บาท · เสร็จสิ้นแล้ว 1 ใบ", Text(poRow.Groups[3].Value));   // issued 2 − closed 1
+        Assert.Equal("ใบสั่งซื้อที่ยังดำเนินการ 1 ใบ 1,790.00 บาท · เสร็จสิ้นแล้ว 1 ใบ ›", Text(poRow.Groups[3].Value));   // issued 2 − closed 1
     }
 
     [Fact]
@@ -191,35 +207,51 @@ public sealed class DashboardPageUiTests : IClassFixture<DashboardPageUiTests.Fa
     }
 
     [Fact]
-    public async Task Movement_and_item_trend_are_secondary_sections_with_shared_tables_and_no_chart_library()
+    public async Task Movement_is_the_main_focus_reads_as_an_equation_and_expands_per_month_from_the_month_cell()
     {
         _factory.AnalyticsFail = false;
         var (_, html) = await GetAsync("/?fy=2569&item=1000123");
         var move = Regex.Match(html, "<section class=\"dashboard-section dashboard-movement\".*?</section>", RegexOptions.Singleline).Value;
         Assert.Contains("class=\"ds-table dashboard-movement-table\"", move);
+        Assert.Contains("ความเคลื่อนไหวรายเดือน <span class=\"dashboard-section-note\">มูลค่า (บาท) · เดือนที่ประมวลผลแล้ว", move);
+        // no technical paragraph under the title; the source explanation stays behind the disclosure
+        Assert.DoesNotContain("dashboard-movement-note", move);
+        Assert.DoesNotContain("ผลประมวลผลรายเดือนจาก INVC", move);
+        Assert.Contains("<summary>ที่มาของข้อมูล</summary>", move);
         var mt = Text(move);
-        Assert.Contains("ต.ค. 2568 ดูแยกหมวดเวชภัณฑ์ ▾ 12,000.00 9,000.00 13", mt);   // month totals unchanged, expander label beside the month
-        Assert.Contains("รวม 16,000.00 11,500.00 18", mt);
-        Assert.Contains("<summary>ดูประเภทรายการเคลื่อนไหว (RO / RS / SS / SO)</summary>", move);   // transaction categories only behind disclosure
-        // per-month item-type expander (CARD → INV_MD.ED_NED → TBLED_NED): one per month, ยา รวม + ED + NED always, other live types when non-zero
-        Assert.Equal(2, Regex.Matches(move, "for=\"mt-\\d{6}\">ดูแยกหมวดเวชภัณฑ์").Count);
-        Assert.Equal(2, Regex.Matches(move, "<div class=\"dashboard-type-panel\"").Count);
-        var oct = Regex.Match(move, "<div class=\"dashboard-type-panel\" id=\"mt-panel-256810\">.*?</div>", RegexOptions.Singleline).Value;
+        // the header itself is the equation
+        Assert.Contains("เดือน ยอดยกมา + รับเข้า − จ่ายออก = คงเหลือ", mt);
+        Assert.DoesNotContain("คงเหลือปลายเดือน", mt);
+        // only processed months (Oct, Nov 2025), newest first; Sep 2025 is opening source only, Dec+ not shown as zero months
+        var rows = Regex.Matches(move, "<tr class=\"ds-row dashboard-processed-row([^\"]*)\">");
+        Assert.Equal(2, rows.Count);
+        Assert.Equal(" is-latest", rows[0].Groups[1].Value); Assert.Equal("", rows[1].Groups[1].Value);
+        Assert.DoesNotContain("ธ.ค. 2568", mt); Assert.DoesNotContain("ล่าสุด", mt); Assert.DoesNotContain("ดูแยกหมวดเวชภัณฑ์", mt);
+        Assert.DoesNotContain("2025-10", mt); Assert.DoesNotContain("2025-11", mt);   // no technical YYYY-MM keys
+        Assert.Contains("พ.ย. 2568 — แยกหมวดเวชภัณฑ์ 95,500.00 2,000.00 6,800.00 90,700.00", mt);   // Oct ending 95,500 → Nov opening
+        Assert.Contains("ต.ค. 2568 — แยกหมวดเวชภัณฑ์ 90,000.00 16,500.00 11,000.00 95,500.00", mt); // Sep 2025 ending → Oct opening
+        Assert.True(mt.IndexOf("พ.ย. 2568", StringComparison.Ordinal) < mt.IndexOf("ต.ค. 2568", StringComparison.Ordinal), "newest month first");
+        // the month cell is the single expand control: button with aria-expanded/aria-controls → hidden row directly below
+        Assert.Equal(2, Regex.Matches(move, "<button type=\"button\" class=\"dashboard-month-toggle\" aria-expanded=\"false\" aria-controls=\"mt-panel-2568(10|11)\">").Count);
+        Assert.Contains("<tr class=\"dashboard-type-row\" id=\"mt-panel-256810\" hidden>", move);
+        Assert.DoesNotContain("dashboard-type-toggle", move); Assert.DoesNotContain("type=\"checkbox\"", move);
+        Assert.Contains("js/dashboard-movement.", html);
+        // expander: ยา รวม + ED + NED always, other types when present, grand total = month row, no diff line when exact
+        var oct = Regex.Match(move, "<tr class=\"dashboard-type-row\" id=\"mt-panel-256810\" hidden>.*?</div>", RegexOptions.Singleline).Value;
         var ot = Text(oct);
-        Assert.Contains("หมวดเวชภัณฑ์ รับเข้า จ่ายออก", ot);
-        Assert.Contains("ยา รวม (ED + NED) 9,000.00 9,000.00", ot);
-        Assert.Contains("ยาในบัญชียาหลักแห่งชาติ (ED) 9,000.00 7,500.00", ot);
-        Assert.Contains("ยานอกบัญชียาหลักแห่งชาติ (NED) 0.00 1,500.00", ot);
-        Assert.Contains("วัสดุการแพทย์ (3) 3,000.00 0.00", ot);
-        Assert.DoesNotContain("ยาตัวอย่าง", ot);                                        // zero / absent type 5 hidden
-        Assert.DoesNotContain("ไม่ระบุประเภท", ot);                                       // no unknown rows in this fixture
-        Assert.Contains("รวม 12,000.00 9,000.00", ot);                                    // equals the month totals (parity)
-        Assert.DoesNotContain("ยอดแยกหมวดไม่ตรง", oct);
-        Assert.DoesNotContain("dashboard-panel", move.Replace("dashboard-type-panel", ""));   // no category card wall
+        Assert.Contains("ประเภท ยอดยกมา รับเข้า จ่ายออก คงเหลือ", ot);
+        Assert.Contains("ยา รวม (ED + NED) 70,000.00 13,500.00 9,000.00 74,500.00", ot);
+        Assert.Contains("ยาในบัญชียาหลักแห่งชาติ (ED) 70,000.00 12,000.00 9,000.00 73,000.00", ot);
+        Assert.Contains("ยานอกบัญชียาหลักแห่งชาติ (NED) 0.00 1,500.00 0.00 1,500.00", ot);
+        Assert.Contains("วัสดุการแพทย์ (3) 20,000.00 3,000.00 2,000.00 21,000.00", ot);
+        Assert.Contains("รวมทั้งหมด 90,000.00 16,500.00 11,000.00 95,500.00", ot);
+        Assert.DoesNotContain("ยาตัวอย่าง", ot); Assert.DoesNotContain("ไม่ระบุประเภท", ot);
+        Assert.DoesNotContain("ส่วนต่างจากผลประมวลผล", oct);
+        Assert.DoesNotContain("dashboard-type-warn", move);
+        Assert.DoesNotContain("RO / RS / SS / SO", move);                                   // CARD categories gone from this section
+        Assert.Contains("<summary>ที่มาของข้อมูล</summary>", move);
+        Assert.DoesNotContain("dashboard-panel", move.Replace("dashboard-type-panel", ""));
         Assert.DoesNotContain("<script", move);
-        Assert.DoesNotContain("<th scope=\"col\">ประเภท (รหัสเดิม)</th>", move);
-        Assert.Contains("dashboard-bar dashboard-bar--in", move);
-        Assert.DoesNotContain("chart.js", html, StringComparison.OrdinalIgnoreCase);
 
         var trend = Regex.Match(html, "<section class=\"dashboard-section dashboard-trend\".*?</section>", RegexOptions.Singleline);
         Assert.True(trend.Index > move.Length, "item trend comes after movement");
@@ -263,6 +295,7 @@ public sealed class DashboardPageUiTests : IClassFixture<DashboardPageUiTests.Fa
         Assert.DoesNotContain("overflow: auto", block);
         Assert.DoesNotContain("overflow-y", block);
         Assert.DoesNotContain("overflow-x", block);
+        Assert.DoesNotContain("overflow: scroll", block);
         Assert.DoesNotContain(".metric-card {", css, StringComparison.Ordinal);
         Assert.DoesNotContain(".pipeline-step {", css, StringComparison.Ordinal);
     }

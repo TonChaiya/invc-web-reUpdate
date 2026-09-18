@@ -36,120 +36,137 @@ public static class DashboardRules
     }
 }
 
-public enum MovementDirection { Receive, Issue, Other }
-
-/// <summary>Legacy CARD category = R_S_STATUS + LEFT(R_S_NUMBER,1). Raw key preserved; direction is a display aid only.</summary>
-public sealed record MovementCategory(string Key, MovementDirection Direction, string ThaiLabel)
+/// <summary>Buddhist "yyyymm" month keys used by every dashboard month list (item trend, processed months).</summary>
+public static class DashboardMonthKey
 {
-    public static MovementCategory FromRaw(string? status, string? number)
+    internal static readonly string[] ThaiMonths = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+
+    public static string Display(string monthKey)
+        => monthKey.Length == 6 && int.TryParse(monthKey[4..], out var m) && m is >= 1 and <= 12
+            ? $"{ThaiMonths[m - 1]} {monthKey[..4]}"
+            : monthKey;
+
+    /// <summary>CE year + month (as stored in MNTH_SUM / MBS_RE_M) → Buddhist yyyymm key.</summary>
+    public static string FromCe(int ceYear, int month) => $"{ceYear + ThaiFiscalYear.BuddhistEraOffset}{month:00}";
+
+    /// <summary>The 12 Buddhist month keys of a Thai fiscal year (Oct of the previous CE year … Sep).</summary>
+    public static IReadOnlyList<string> FiscalYearMonths(int buddhistFiscalYear)
     {
-        var s = string.IsNullOrEmpty(status) ? "?" : status.Trim().ToUpperInvariant();
-        var p = string.IsNullOrEmpty(number) ? "?" : number.Substring(0, 1).ToUpperInvariant();
-        var direction = s switch { "R" => MovementDirection.Receive, "S" => MovementDirection.Issue, _ => MovementDirection.Other };
-        var label = (s, p) switch
-        {
-            ("R", "O") => "รับเข้า (ใบรับอื่น/CUP)",
-            ("R", "S") => "รับคืนจากคลังย่อย",
-            ("R", _) => "รับเข้า",
-            ("S", "S") => "จ่ายให้คลังย่อย",
-            ("S", "O") => "จ่ายออกอื่น",
-            ("S", _) => "จ่ายออก",
-            _ => "อื่น ๆ",
-        };
-        return new MovementCategory(s + p, direction, label);
+        var ceStart = buddhistFiscalYear - ThaiFiscalYear.BuddhistEraOffset - 1;   // October of FY-1 (CE)
+        return Enumerable.Range(0, 12).Select(i => { var d = new DateOnly(ceStart, 10, 1).AddMonths(i); return FromCe(d.Year, d.Month); }).ToList();
+    }
+
+    /// <summary>The calendar month immediately before <paramref name="monthKey"/> (Buddhist yyyymm).</summary>
+    public static string Previous(string monthKey)
+    {
+        var y = int.Parse(monthKey[..4]); var m = int.Parse(monthKey[4..]);
+        return m == 1 ? $"{y - 1}12" : $"{y}{m - 1:00}";
     }
 }
 
-/// <summary>Raw aggregate row from CARD: one month × one category.</summary>
-public sealed record DashboardMovementRow(string MonthKey, string? Status, string? NumberPrefix, int Count, decimal Value, decimal Quantity);
-
-public sealed record DashboardMovementCategory(MovementCategory Category, int Count, decimal Value, decimal Quantity);
-
 /// <summary>
-/// Item-type dimension of the same CARD rows (2026-09-18): CARD.WORKING_CODE → INV_MD.ED_NED → TBLED_NED (EDCODE/EDNAME),
-/// resolved with deterministic TOP 1 lookups so CARD rows are never multiplied. Orthogonal to <see cref="MovementCategory"/>
-/// (RO/RS/SS/SO = transaction direction/source). Null/blank/unmapped codes stay as an explicit "ไม่ระบุประเภท" bucket.
+/// One aggregated MNTH_SUM cell: complete end-of-month snapshot for (CE year, month, historical ED_NED).
+/// Loaded for the fiscal year PLUS the immediately preceding calendar month (only as the opening source of the first FY month).
 /// </summary>
-public sealed record DashboardMovementItemTypeRow(string MonthKey, string? Status, string? NumberPrefix, string? ItemTypeCode, string? ItemTypeName, int Count, decimal Value, decimal Quantity);
+public sealed record DashboardProcessedSnapshotRow(int Year, int Month, string? EdNed, string? EdNedName, int ItemCount, decimal QtyRemain, decimal TotalValue);
 
-/// <summary>Per-month value of one item type by direction (presentation aggregation only).</summary>
-public sealed record DashboardMovementTypeSummary(string Code, string Name, decimal ReceiveValue, decimal IssueValue, decimal OtherValue, int Count)
+/// <summary>One aggregated MBS_RE_M cell: monthly receive / issue flow for (CE year, month, historical ED_NED). Only items with movement exist here.</summary>
+public sealed record DashboardProcessedFlowRow(int Year, int Month, string? EdNed, string? EdNedName, int ItemCount, decimal RcvQuan, decimal RcvValue, decimal SaleQuan, decimal SaleValue);
+
+/// <summary>Opening + receive − issue = ending for one item type inside one processed month (value; quantity kept for validation).</summary>
+public sealed record DashboardMonthlyTypeBalance(string Code, string Name, decimal? OpeningValue, decimal ReceiveValue, decimal IssueValue, decimal EndingValue,
+                                                 decimal? OpeningQty, decimal ReceiveQty, decimal IssueQty, decimal EndingQty)
 {
     public const string UnknownCode = "?";
     public const string UnknownName = "ไม่ระบุประเภท";
     public bool IsUnknown => Code == UnknownCode;
-    public bool HasValue => ReceiveValue != 0m || IssueValue != 0m || OtherValue != 0m;
+    public bool HasOpening => OpeningValue.HasValue;
+    public decimal? CalculatedEnding => OpeningValue is { } o ? o + ReceiveValue - IssueValue : null;
+    /// <summary>Actual − calculated; null when there is no opening. Never used to alter values.</summary>
+    public decimal? Difference => CalculatedEnding is { } c ? EndingValue - c : null;
+    public bool HasAnyValue => OpeningValue is not null and not 0m || ReceiveValue != 0m || IssueValue != 0m || EndingValue != 0m;
 }
 
-public sealed record DashboardMovementMonth(string MonthKey, IReadOnlyList<DashboardMovementCategory> Categories)
+/// <summary>
+/// One INVC-processed month (exists only when MNTH_SUM has it). Opening = previous CALENDAR month's MNTH_SUM ending
+/// (null when that month was not processed — never bridged to an older month, never shown as 0).
+/// </summary>
+public sealed record DashboardProcessedMonth(string MonthKey, string? PreviousMonthKey, decimal? OpeningValue, decimal ReceiveValue, decimal IssueValue, decimal EndingValue,
+                                             decimal? OpeningQty, decimal ReceiveQty, decimal IssueQty, decimal EndingQty, int ItemCount, IReadOnlyList<DashboardMonthlyTypeBalance> Types)
 {
-    /// <summary>Item-type breakdown (codes 1–5 + unknown), EDCODE order; empty when the type query was not supplied.</summary>
-    public IReadOnlyList<DashboardMovementTypeSummary> ItemTypes { get; init; } = [];
+    public string DisplayMonth => DashboardMonthKey.Display(MonthKey);
+    public bool HasOpening => OpeningValue.HasValue;
+    public decimal? CalculatedEnding => OpeningValue is { } o ? o + ReceiveValue - IssueValue : null;
+    public decimal? Difference => CalculatedEnding is { } c ? EndingValue - c : null;
+    public decimal? QtyDifference => OpeningQty is { } o ? EndingQty - (o + ReceiveQty - IssueQty) : null;
 
-    public DashboardMovementTypeSummary? Type(string code) => ItemTypes.FirstOrDefault(t => t.Code == code);
-
-    /// <summary>ยา รวม = ED (1) + NED (2): a subtotal for display, never added to the grand total.</summary>
+    public DashboardMonthlyTypeBalance? Type(string code) => Types.FirstOrDefault(t => t.Code == code);
+    /// <summary>ยา รวม = ED (1) + NED (2): display subtotal only, never added to the grand total.</summary>
+    public decimal? DrugOpeningValue => Type("1")?.OpeningValue is null && Type("2")?.OpeningValue is null ? null : (Type("1")?.OpeningValue ?? 0m) + (Type("2")?.OpeningValue ?? 0m);
     public decimal DrugReceiveValue => (Type("1")?.ReceiveValue ?? 0m) + (Type("2")?.ReceiveValue ?? 0m);
     public decimal DrugIssueValue => (Type("1")?.IssueValue ?? 0m) + (Type("2")?.IssueValue ?? 0m);
-    public decimal DrugOtherValue => (Type("1")?.OtherValue ?? 0m) + (Type("2")?.OtherValue ?? 0m);
+    public decimal DrugEndingValue => (Type("1")?.EndingValue ?? 0m) + (Type("2")?.EndingValue ?? 0m);
 
-    /// <summary>Parity invariants: the type dimension must re-add to the D9 totals of this month.</summary>
-    public decimal TypeReceiveTotal => ItemTypes.Sum(t => t.ReceiveValue);
-    public decimal TypeIssueTotal => ItemTypes.Sum(t => t.IssueValue);
-    public decimal TypeOtherTotal => ItemTypes.Sum(t => t.OtherValue);
-    public bool TypesMatchTotals => ItemTypes.Count > 0 && TypeReceiveTotal == ReceiveValue && TypeIssueTotal == IssueValue && TypeOtherTotal == OtherValue;
-
-    public decimal ReceiveValue => Categories.Where(c => c.Category.Direction == MovementDirection.Receive).Sum(c => c.Value);
-    public decimal IssueValue => Categories.Where(c => c.Category.Direction == MovementDirection.Issue).Sum(c => c.Value);
-    public decimal OtherValue => Categories.Where(c => c.Category.Direction == MovementDirection.Other).Sum(c => c.Value);
-    public int Count => Categories.Sum(c => c.Count);
-
-    /// <summary>256810 → "ต.ค. 2568".</summary>
-    public string DisplayMonth => MonthKey.Length == 6 && int.TryParse(MonthKey[4..], out var m) && m is >= 1 and <= 12
-        ? $"{ThaiMonths[m - 1]} {MonthKey[..4]}"
-        : MonthKey;
-
-    internal static readonly string[] ThaiMonths = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+    /// <summary>Grand total over actual categories (1..5 + unknown) — must equal the month figures.</summary>
+    public decimal? TypeOpeningTotal => Types.Any(t => t.OpeningValue.HasValue) ? Types.Sum(t => t.OpeningValue ?? 0m) : null;
+    public decimal TypeReceiveTotal => Types.Sum(t => t.ReceiveValue);
+    public decimal TypeIssueTotal => Types.Sum(t => t.IssueValue);
+    public decimal TypeEndingTotal => Types.Sum(t => t.EndingValue);
+    public bool TypesMatchTotals => TypeReceiveTotal == ReceiveValue && TypeIssueTotal == IssueValue && TypeEndingTotal == EndingValue && (TypeOpeningTotal ?? 0m) == (OpeningValue ?? 0m);
 }
 
-public static class DashboardMovement
+public sealed record DashboardProcessedMovement(int FiscalYear, IReadOnlyList<DashboardProcessedMonth> Months)
 {
-    /// <summary>Groups raw rows by month (newest first); every raw category is retained under its month.</summary>
-    public static IReadOnlyList<DashboardMovementMonth> Build(IEnumerable<DashboardMovementRow> rows)
-        => rows.GroupBy(r => r.MonthKey)
-            .OrderByDescending(g => g.Key, StringComparer.Ordinal)
-            .Select(g => new DashboardMovementMonth(g.Key,
-                g.GroupBy(r => MovementCategory.FromRaw(r.Status, r.NumberPrefix))
-                 .Select(c => new DashboardMovementCategory(c.Key, c.Sum(r => r.Count), c.Sum(r => r.Value), c.Sum(r => r.Quantity)))
-                 .OrderBy(c => c.Category.Key, StringComparer.Ordinal).ToList()))
-            .ToList();
+    public DashboardProcessedMonth? Latest => Months.FirstOrDefault();
+    public int ProcessedMonthCount => Months.Count;
+}
 
-    /// <summary>
-    /// D9 months (unchanged) plus the item-type breakdown of each month from the typed rows. Direction of a typed row uses the
-    /// same <see cref="MovementCategory.FromRaw"/> rule as the totals, so per-month type sums equal ReceiveValue / IssueValue / OtherValue.
-    /// </summary>
-    public static IReadOnlyList<DashboardMovementMonth> Build(IEnumerable<DashboardMovementRow> rows, IEnumerable<DashboardMovementItemTypeRow> typedRows)
+/// <summary>
+/// Builds the processed monthly report from MNTH_SUM (snapshots) and MBS_RE_M (flows), verified 2026-09-18 against live INV:
+/// previous MNTH_SUM ending + MBS_RE_M receive − MBS_RE_M issue = current MNTH_SUM ending, exactly, per month and per ED_NED.
+/// MBS_RE_M.REMAIN_* is deliberately not used (it covers only items with movement). Months come only from MNTH_SUM.
+/// </summary>
+public static class DashboardProcessedMovementBuilder
+{
+    public static DashboardProcessedMovement Build(int fiscalYear, IEnumerable<DashboardProcessedSnapshotRow> snapshots, IEnumerable<DashboardProcessedFlowRow> flows)
     {
-        var byMonth = typedRows.GroupBy(r => r.MonthKey).ToDictionary(g => g.Key, g => g.ToList());
-        return Build(rows).Select(m => m with { ItemTypes = byMonth.TryGetValue(m.MonthKey, out var t) ? Summarize(t) : [] }).ToList();
+        var fyMonths = DashboardMonthKey.FiscalYearMonths(fiscalYear);
+        var snapByMonth = snapshots.GroupBy(s => DashboardMonthKey.FromCe(s.Year, s.Month)).ToDictionary(g => g.Key, g => g.ToList());
+        var flowByMonth = flows.GroupBy(f => DashboardMonthKey.FromCe(f.Year, f.Month)).ToDictionary(g => g.Key, g => g.ToList());
+
+        var months = new List<DashboardProcessedMonth>();
+        foreach (var key in fyMonths.Where(snapByMonth.ContainsKey).OrderByDescending(k => k, StringComparer.Ordinal))
+        {
+            var prevKey = DashboardMonthKey.Previous(key);
+            var hasPrev = snapByMonth.TryGetValue(prevKey, out var prevSnap);            // only the immediately preceding calendar month
+            var cur = snapByMonth[key];
+            var flow = flowByMonth.TryGetValue(key, out var f) ? f : [];
+
+            var codes = cur.Select(s => Code(s.EdNed)).Concat(flow.Select(x => Code(x.EdNed))).Concat(hasPrev ? prevSnap!.Select(s => Code(s.EdNed)) : [])
+                           .Distinct().OrderBy(c => c == DashboardMonthlyTypeBalance.UnknownCode ? 1 : 0).ThenBy(c => c, StringComparer.Ordinal).ToList();
+            var types = codes.Select(code =>
+            {
+                var c = cur.Where(s => Code(s.EdNed) == code).ToList();
+                var p = hasPrev ? prevSnap!.Where(s => Code(s.EdNed) == code).ToList() : null;
+                var fl = flow.Where(x => Code(x.EdNed) == code).ToList();
+                var name = code == DashboardMonthlyTypeBalance.UnknownCode ? DashboardMonthlyTypeBalance.UnknownName
+                         : c.Select(s => s.EdNedName).Concat(fl.Select(x => x.EdNedName)).FirstOrDefault(n => !string.IsNullOrWhiteSpace(n)) ?? $"รหัส {code} (ไม่พบใน TBLED_NED)";
+                return new DashboardMonthlyTypeBalance(code, name,
+                    hasPrev ? p!.Sum(s => s.TotalValue) : null, fl.Sum(x => x.RcvValue), fl.Sum(x => x.SaleValue), c.Sum(s => s.TotalValue),
+                    hasPrev ? p!.Sum(s => s.QtyRemain) : null, fl.Sum(x => x.RcvQuan), fl.Sum(x => x.SaleQuan), c.Sum(s => s.QtyRemain));
+            }).ToList();
+
+            months.Add(new DashboardProcessedMonth(key, hasPrev ? prevKey : null,
+                hasPrev ? prevSnap!.Sum(s => s.TotalValue) : null, flow.Sum(x => x.RcvValue), flow.Sum(x => x.SaleValue), cur.Sum(s => s.TotalValue),
+                hasPrev ? prevSnap!.Sum(s => s.QtyRemain) : null, flow.Sum(x => x.RcvQuan), flow.Sum(x => x.SaleQuan), cur.Sum(s => s.QtyRemain),
+                cur.Sum(s => s.ItemCount), types));
+        }
+        return new DashboardProcessedMovement(fiscalYear, months);
     }
 
-    internal static IReadOnlyList<DashboardMovementTypeSummary> Summarize(IEnumerable<DashboardMovementItemTypeRow> rows)
-        => rows
-            .GroupBy(r => string.IsNullOrWhiteSpace(r.ItemTypeCode) ? DashboardMovementTypeSummary.UnknownCode : r.ItemTypeCode!.Trim())
-            .Select(g =>
-            {
-                var code = g.Key;
-                var name = code == DashboardMovementTypeSummary.UnknownCode ? DashboardMovementTypeSummary.UnknownName
-                         : g.Select(r => r.ItemTypeName).FirstOrDefault(n => !string.IsNullOrWhiteSpace(n)) ?? $"รหัส {code} (ไม่พบใน TBLED_NED)";
-                decimal Sum(MovementDirection d) => g.Where(r => MovementCategory.FromRaw(r.Status, r.NumberPrefix).Direction == d).Sum(r => r.Value);
-                return new DashboardMovementTypeSummary(code, name, Sum(MovementDirection.Receive), Sum(MovementDirection.Issue), Sum(MovementDirection.Other), g.Sum(r => r.Count));
-            })
-            .OrderBy(t => t.IsUnknown ? 1 : 0).ThenBy(t => t.Code, StringComparer.Ordinal)
-            .ToList();
+    private static string Code(string? edNed) => string.IsNullOrWhiteSpace(edNed) ? DashboardMonthlyTypeBalance.UnknownCode : edNed.Trim();
 }
 
-/// <summary>D1: BUDGET rows for the selected year (legacy SUM(money)).</summary>
 public sealed record DashboardBudget(int FiscalYear, int RowCount, decimal? TotalMoney)
 {
     public bool HasBudget => RowCount > 0 && TotalMoney.HasValue;
@@ -169,7 +186,7 @@ public sealed record DashboardStockCoverage(string? Year, string? Month, decimal
     public bool HasPeriod => !string.IsNullOrEmpty(Year) && !string.IsNullOrEmpty(Month);
     public decimal? Ratio => DashboardRules.StockCoverage(MonthEndValue, SaleValue);
     public string DisplayPeriod => HasPeriod && int.TryParse(Month, out var m) && m is >= 1 and <= 12 && int.TryParse(Year, out var y)
-        ? $"{DashboardMovementMonth.ThaiMonths[m - 1]} {y + ThaiFiscalYear.BuddhistEraOffset}"
+        ? $"{DashboardMonthKey.ThaiMonths[m - 1]} {y + ThaiFiscalYear.BuddhistEraOffset}"
         : "–";
 }
 
@@ -225,7 +242,8 @@ public sealed record DashboardSnapshot
     public required DashboardSection<DashboardStockCoverage> Coverage { get; init; }
     public required DashboardSection<IReadOnlyList<DashboardEdNedRow>> EdNed { get; init; }
     public required DashboardSection<DashboardAgreements> Agreements { get; init; }
-    public required DashboardSection<IReadOnlyList<DashboardMovementMonth>> Movement { get; init; }
+    /// <summary>INVC-processed monthly report (MNTH_SUM + MBS_RE_M), replaces the former CARD-based monthly movement.</summary>
+    public required DashboardSection<DashboardProcessedMovement> Movement { get; init; }
     public required DashboardSection<IReadOnlyList<DashboardProcessTimeRow>> ProcessTime { get; init; }
     public required DashboardSection<DashboardItemTrend?> ItemTrend { get; init; }
 
@@ -243,10 +261,12 @@ public interface IDashboardAnalyticsRepository
     Task<DashboardStockCoverage> GetStockCoverageAsync(CancellationToken ct = default);
     Task<IReadOnlyList<DashboardEdNedRow>> GetLegacyEdNedAsync(CancellationToken ct = default);
     Task<IReadOnlyList<DashboardAgreementRow>> GetActiveAgreementsAsync(DateTime today, CancellationToken ct = default);
-    Task<IReadOnlyList<DashboardMovementRow>> GetMovementAsync(int fiscalYear, CancellationToken ct = default);
+    /// <summary>MNTH_SUM aggregated per (YEAR, MONTH, historical ED_NED) for the fiscal year's months PLUS the immediately preceding calendar month.</summary>
+    Task<IReadOnlyList<DashboardProcessedSnapshotRow>> GetProcessedSnapshotsAsync(int fiscalYear, CancellationToken ct = default);
 
-    /// <summary>Same CARD window as <see cref="GetMovementAsync"/>, additionally grouped by the item's ED_NED type (TBLED_NED).</summary>
-    Task<IReadOnlyList<DashboardMovementItemTypeRow>> GetMovementByItemTypeAsync(int fiscalYear, CancellationToken ct = default);
+    /// <summary>MBS_RE_M aggregated per (YEAR, MONTH, historical ED_NED) for the fiscal year's months.</summary>
+    Task<IReadOnlyList<DashboardProcessedFlowRow>> GetProcessedFlowsAsync(int fiscalYear, CancellationToken ct = default);
+
     Task<IReadOnlyList<DashboardProcessTimeRow>> GetProcessTimeAsync(int fiscalYear, CancellationToken ct = default);
     Task<DashboardItemTrend?> GetItemTrendAsync(string workingCode, int months, CancellationToken ct = default);
 }
