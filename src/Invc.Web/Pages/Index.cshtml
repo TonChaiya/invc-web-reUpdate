@@ -4,38 +4,54 @@
 @using Invc.Core.Reorder
 @model IndexModel
 @{
-    ViewData["Title"] = "แดชบอร์ด";
+    ViewData["Title"] = "ภาพรวม";
     ViewData["HideNavSearch"] = true;
     var s = Model.Snapshot;
+    var pipeline = new[] { PurchaseOrderBucket.Issued, PurchaseOrderBucket.Received, PurchaseOrderBucket.Accounting, PurchaseOrderBucket.Finance, PurchaseOrderBucket.Closed };
+    static string StepLabel(PurchaseOrderBucket b) => b switch
+    {
+        PurchaseOrderBucket.Issued => "ออกใบสั่งซื้อ",
+        PurchaseOrderBucket.Received => "ตรวจรับ",
+        PurchaseOrderBucket.Accounting => "ตั้งหนี้",
+        PurchaseOrderBucket.Finance => "การเงิน",
+        PurchaseOrderBucket.Closed => "เสร็จสิ้น",
+        _ => b.ThaiLabel(),
+    };
 }
 
+<div class="dashboard-page ds-page">
 @if (Model.Health is { IsHealthy: false })
 {
-    <div class="page-header">
-        <h1 class="h3 mb-0">แดชบอร์ดคลังเวชภัณฑ์ <span class="page-subtitle">INVC Dashboard</span></h1>
+    <div class="ds-page-header dashboard-header">
+        <div>
+            <h1 class="ds-page-title">ภาพรวม</h1>
+            <p class="ds-page-subtitle">สถานะคลังเวชภัณฑ์และงานที่ต้องดำเนินการ</p>
+        </div>
     </div>
-    <div class="alert alert-danger" role="alert">
-        <strong>เชื่อมต่อฐานข้อมูล INV ไม่ได้</strong> — แดชบอร์ดไม่สามารถแสดงข้อมูลได้ในขณะนี้ ดูรายละเอียดที่หน้า <a asp-page="/Health" class="alert-link">สถานะระบบ</a>
+    <div class="ds-error dashboard-error" role="alert">
+        <strong>เชื่อมต่อฐานข้อมูล INV ไม่ได้</strong> — ภาพรวมไม่สามารถแสดงข้อมูลได้ในขณะนี้ ดูรายละเอียดที่หน้า <a asp-page="/Health">สถานะระบบ</a>
     </div>
 }
 else if (s is null)
 {
-    <div class="alert alert-danger" role="alert">ไม่สามารถประกอบข้อมูลแดชบอร์ดได้ กรุณาลองใหม่หรือตรวจสอบหน้า <a asp-page="/Health" class="alert-link">สถานะระบบ</a></div>
+    <div class="ds-page-header dashboard-header"><div><h1 class="ds-page-title">ภาพรวม</h1></div></div>
+    <div class="ds-error" role="alert">ไม่สามารถประกอบข้อมูลภาพรวมได้ กรุณาลองใหม่หรือตรวจสอบหน้า <a asp-page="/Health">สถานะระบบ</a></div>
 }
 else
 {
-    <div class="page-header d-flex flex-wrap align-items-end justify-content-between gap-2">
+    <div class="ds-page-header dashboard-header">
         <div>
-            <h1 class="h3 mb-0">แดชบอร์ดคลังเวชภัณฑ์ <span class="page-subtitle">INVC Dashboard</span></h1>
-            <p class="text-muted mb-0 small">
-                ข้อมูล ณ @s.AsOf.ToString("d MMMM yyyy HH:mm") ·
-                <span class="status-dot status-dot-ok" aria-hidden="true"></span> ฐานข้อมูล INV ปกติ (อ่านอย่างเดียว)
-                @if (s.FailedSectionCount > 0) { <span class="text-warning">· มี @s.FailedSectionCount ส่วนที่แสดงไม่ได้</span> }
+            <h1 class="ds-page-title">ภาพรวม</h1>
+            <p class="ds-page-subtitle">สถานะคลังเวชภัณฑ์และงานที่ต้องดำเนินการ</p>
+            <p class="ds-page-context dashboard-context">
+                ข้อมูล ณ @s.AsOf.ToString("d MMM yyyy HH:mm") · INV อ่านอย่างเดียว ·
+                <span class="status-dot status-dot-ok" aria-hidden="true"></span> ฐานข้อมูลปกติ
+                @if (s.FailedSectionCount > 0) { <span class="dashboard-context-warn">· @s.FailedSectionCount ส่วนแสดงไม่ได้</span> }
             </p>
         </div>
-        <form method="get" class="d-flex align-items-center gap-2" aria-label="เลือกปีงบประมาณ">
-            <label for="fy" class="small text-muted mb-0">ปีงบประมาณ</label>
-            <select class="form-select form-select-sm w-auto" id="fy" name="fy" onchange="this.form.submit()">
+        <form method="get" class="dashboard-fy" aria-label="เลือกปีงบประมาณ">
+            <label for="fy" class="visually-hidden">ปีงบประมาณ</label>
+            <select class="ds-select" id="fy" name="fy" aria-label="ปีงบประมาณ" onchange="this.form.submit()">
                 @foreach (var y in s.FiscalYearOptions)
                 {
                     <option value="@y" selected="@(y == s.FiscalYear)">ปีงบ @y</option>
@@ -44,283 +60,322 @@ else
             @if (Model.ItemCode is not null) { <input type="hidden" name="item" value="@Model.ItemCode" /> }
         </form>
     </div>
-    @if (s.FiscalYearNote is not null) { <div class="alert alert-warning py-2 small" role="status">@s.FiscalYearNote</div> }
+    @if (s.FiscalYearNote is not null) { <p class="ds-warning" role="status">@s.FiscalYearNote</p> }
 
-    @* ---------- Primary operational KPIs ---------- *@
-    <section aria-labelledby="h-primary" class="mb-4">
-        <h2 id="h-primary" class="section-header">ภาพรวมการปฏิบัติงาน</h2>
-        <div class="row g-2">
-            <div class="col-6 col-lg-3">
-                @if (s.Inventory is { IsAvailable: true, Value: { } inv })
+    @* ---------- A. สิ่งที่ต้องดำเนินการ — first, one action list, no KPI cards ---------- *@
+    <section class="dashboard-section dashboard-actions" aria-labelledby="h-actions">
+        <h2 id="h-actions" class="dashboard-section-title">สิ่งที่ต้องดำเนินการ</h2>
+        <div class="dashboard-action-list">
+            @if (s.Reorder is { IsAvailable: true, Value: { } ro })
+            {
+                <a class="dashboard-action-row @(ro.RedCount > 0 ? "is-danger" : "is-ok")" asp-page="/Reorder/Index" asp-route-status="red">
+                    <span class="dashboard-action-mark" aria-hidden="true"></span>
+                    <span class="dashboard-action-main">
+                        <span class="dashboard-action-title">ต้องสั่งซื้อทันที</span>
+                        <span class="dashboard-action-detail">@ro.RedCount.ToString("N0") รายการ@(ro.RedCount > 0 ? $" · แนะนำสั่งรวม {ro.RedSuggestedTotal:N0} หน่วย" : " · ไม่มีรายการต่ำกว่า MIN")</span>
+                    </span>
+                    <span class="dashboard-action-count">@ro.RedCount.ToString("N0")</span>
+                    <span class="dashboard-action-open">เปิด</span>
+                </a>
+                @if (ro.YellowCount > 0)
                 {
-                    <a class="metric-card metric-info" asp-page="/Inventory/Status">
-                        <span class="metric-label">คงคลัง (รายการที่ใช้งาน)</span>
-                        <span class="metric-value">@inv.ActiveItemCount.ToString("N0") <small>รายการ</small></span>
-                        <span class="metric-foot">มูลค่า @inv.TotalValue.ToString("N2") บาท · ข้อมูลปัจจุบัน</span>
+                    <a class="dashboard-action-row is-warning" asp-page="/Reorder/Index" asp-route-status="yellow">
+                        <span class="dashboard-action-mark" aria-hidden="true"></span>
+                        <span class="dashboard-action-main">
+                            <span class="dashboard-action-title">ใกล้ถึงจุดสั่งซื้อ</span>
+                            <span class="dashboard-action-detail">@ro.YellowCount.ToString("N0") รายการ</span>
+                        </span>
+                        <span class="dashboard-action-count">@ro.YellowCount.ToString("N0")</span>
+                        <span class="dashboard-action-open">เปิด</span>
                     </a>
                 }
-                else { <partial name="_SectionUnavailable" model="@("คงคลัง")" /> }
-            </div>
-            <div class="col-6 col-lg-3">
-                @if (s.Reorder is { IsAvailable: true, Value: { } ro })
-                {
-                    <a class="metric-card @(ro.RedCount > 0 ? "metric-danger" : "metric-success")" asp-page="/Reorder/Index" asp-route-status="red">
-                        <span class="metric-label">ต้องสั่งซื้อทันที</span>
-                        <span class="metric-value">@ro.RedCount.ToString("N0") <small>รายการ</small></span>
-                        <span class="metric-foot">ใกล้ถึงจุดสั่งซื้อ @ro.YellowCount.ToString("N0") · แนะนำสั่งรวม @ro.RedSuggestedTotal.ToString("N0") หน่วย</span>
-                    </a>
-                }
-                else { <partial name="_SectionUnavailable" model="@("คำแนะนำการสั่งซื้อ")" /> }
-            </div>
-            <div class="col-6 col-lg-3">
-                @if (s.PurchaseOrders is { IsAvailable: true, Value: { } po })
-                {
-                    var issued = po.Buckets[PurchaseOrderBucket.Issued];
-                    <a class="metric-card metric-primary" asp-page="/PurchaseOrders/Index" asp-route-fy="@s.FiscalYear" asp-route-bucket="issued">
-                        <span class="metric-label">ใบสั่งซื้อ ปีงบ @s.FiscalYear</span>
-                        <span class="metric-value">@issued.Count.ToString("N0") <small>ใบ</small></span>
-                        <span class="metric-foot">มูลค่า @issued.TotalValue.ToString("N2") บาท · เสร็จสิ้น @po.Buckets[PurchaseOrderBucket.Closed].Count.ToString("N0") ใบ</span>
-                    </a>
-                }
-                else { <partial name="_SectionUnavailable" model="@("ใบสั่งซื้อ")" /> }
-            </div>
-            <div class="col-6 col-lg-3">
-                @if (s.Receipts is { IsAvailable: true, Value: { } rc })
-                {
-                    <a class="metric-card metric-success" asp-page="/Receipts/Index" asp-route-fy="@s.FiscalYear">
-                        <span class="metric-label">รับเข้าอื่น / CUP ปีงบ @s.FiscalYear</span>
-                        <span class="metric-value">@rc.HeaderCount.ToString("N0") <small>ใบ</small></span>
-                        <span class="metric-foot">@rc.LineCount.ToString("N0") รายการ · มูลค่า @rc.TotalValue.ToString("N2") บาท</span>
-                    </a>
-                }
-                else { <partial name="_SectionUnavailable" model="@("รับเข้าอื่น")" /> }
-            </div>
+            }
+            else { <partial name="_SectionUnavailable" model="@("คำแนะนำการสั่งซื้อ")" /> }
+
+            @if (s.PurchaseOrders is { IsAvailable: true, Value: { } poA })
+            {
+                @* ใบสั่งซื้อที่ยังดำเนินการ = issued (not cancelled) minus closed — plain arithmetic on the existing buckets *@
+                var issued = poA.Buckets[PurchaseOrderBucket.Issued];
+                var closed = poA.Buckets[PurchaseOrderBucket.Closed];
+                var activeCount = issued.Count - closed.Count;
+                var activeValue = issued.TotalValue - closed.TotalValue;
+                <a class="dashboard-action-row @(activeCount > 0 ? "is-workflow" : "is-ok")" asp-page="/PurchaseOrders/Index" asp-route-fy="@s.FiscalYear" asp-route-bucket="issued">
+                    <span class="dashboard-action-mark" aria-hidden="true"></span>
+                    <span class="dashboard-action-main">
+                        <span class="dashboard-action-title">ใบสั่งซื้อที่ยังดำเนินการ</span>
+                        <span class="dashboard-action-detail">@activeCount.ToString("N0") ใบ · @activeValue.ToString("N2") บาท@(closed.Count > 0 ? $" · เสร็จสิ้นแล้ว {closed.Count:N0} ใบ" : "")</span>
+                    </span>
+                    <span class="dashboard-action-count">@activeCount.ToString("N0")</span>
+                    <span class="dashboard-action-open">เปิด</span>
+                </a>
+            }
+            else { <partial name="_SectionUnavailable" model="@("ใบสั่งซื้อ")" /> }
+
+            @if (s.FailedSectionCount > 0)
+            {
+                <a class="dashboard-action-row is-warning" asp-page="/Health">
+                    <span class="dashboard-action-mark" aria-hidden="true"></span>
+                    <span class="dashboard-action-main">
+                        <span class="dashboard-action-title">ส่วนที่แสดงข้อมูลไม่ได้</span>
+                        <span class="dashboard-action-detail">@s.FailedSectionCount ส่วน · ตรวจสอบสถานะระบบ</span>
+                    </span>
+                    <span class="dashboard-action-count">@s.FailedSectionCount</span>
+                    <span class="dashboard-action-open">เปิด</span>
+                </a>
+            }
         </div>
     </section>
 
-    @* ---------- Stock management ---------- *@
-    <section aria-labelledby="h-stock" class="mb-4">
-        <h2 id="h-stock" class="section-header">การบริหารคลัง <span class="section-note">ข้อมูลปัจจุบัน ยกเว้นที่ระบุช่วงเวลา</span></h2>
-        <div class="row g-2">
-            <div class="col-6 col-lg-3">
-                @if (s.Inventory is { IsAvailable: true, Value: { } inv2 })
+    @* ---------- B. ภาพรวมคลัง — one inventory summary (value appears once) + supporting panels ---------- *@
+    <section class="dashboard-section dashboard-stock" aria-labelledby="h-stock">
+        <h2 id="h-stock" class="dashboard-section-title">ภาพรวมคลัง <span class="dashboard-section-note">ข้อมูลปัจจุบัน ยกเว้นที่ระบุงวด</span></h2>
+        <div class="dashboard-stock-grid">
+            <div class="dashboard-panel dashboard-summary">
+                @if (s.Inventory is { IsAvailable: true, Value: { } inv })
                 {
-                    <div class="metric-card">
-                        <span class="metric-label">มูลค่าคลังหลัก</span>
-                        <span class="metric-value">@inv2.TotalValue.ToString("N2")</span>
-                        <span class="metric-foot">บาท · @inv2.TotalQtyOnHand.ToString("N0") หน่วยจ่าย · รายการที่ใช้งาน</span>
+                    <a class="dashboard-panel-title" asp-page="/Inventory/Status">คลังเวชภัณฑ์หลัก</a>
+                    <div class="ds-summary dashboard-summary-strip">
+                        <span class="ds-stat"><strong>@inv.ActiveItemCount.ToString("N0")</strong> รายการใช้งาน</span>
+                        <span class="ds-stat"><strong>@inv.TotalQtyOnHand.ToString("N0")</strong> หน่วย</span>
+                        <span class="ds-stat">มูลค่า <strong>@inv.TotalValue.ToString("N2")</strong> บาท</span>
                     </div>
                 }
-                else { <partial name="_SectionUnavailable" model="@("มูลค่าคลังหลัก")" /> }
-            </div>
-            <div class="col-6 col-lg-3">
-                @if (s.Substock is { IsAvailable: true, Value: { } sub })
-                {
-                    <div class="metric-card">
-                        <span class="metric-label">มูลค่าคลังย่อย</span>
-                        <span class="metric-value">@sub.TotalValue.ToString("N2")</span>
-                        <span class="metric-foot">บาท · @sub.ByDepartment.Count หน่วยเบิก · @sub.RowCount.ToString("N0") รายการ</span>
-                        @if (sub.ByDepartment.Count > 0)
-                        {
-                            <ul class="metric-list">
-                                @foreach (var d in sub.ByDepartment) { <li><span>@d.DisplayName</span><span>@d.TotalValue.ToString("N2")</span></li> }
-                            </ul>
-                        }
-                    </div>
-                }
-                else { <partial name="_SectionUnavailable" model="@("มูลค่าคลังย่อย")" /> }
-            </div>
-            <div class="col-6 col-lg-3">
-                @if (s.Coverage is { IsAvailable: true, Value: { } cov })
-                {
-                    <div class="metric-card">
-                        <span class="metric-label">อัตราสำรองคลัง (เดือน)</span>
-                        @if (cov.HasPeriod && cov.Ratio is { } ratio)
-                        {
-                            <span class="metric-value">@ratio.ToString("N2")</span>
-                            <span class="metric-foot">มูลค่าคงคลังสิ้นเดือน ÷ มูลค่าจ่าย · งวด @cov.DisplayPeriod (สรุปสิ้นเดือน ไม่ใช่ยอดปัจจุบัน)</span>
-                        }
-                        else if (cov.HasPeriod)
-                        {
-                            <span class="metric-value metric-na">N/A</span>
-                            <span class="metric-foot">งวด @cov.DisplayPeriod ไม่มียอดจ่าย (หารไม่ได้)</span>
-                        }
-                        else
-                        {
-                            <span class="metric-value metric-na">N/A</span>
-                            <span class="metric-foot">ยังไม่มีข้อมูลสรุปรายเดือน (MBS_RE_M)</span>
-                        }
-                    </div>
-                }
-                else { <partial name="_SectionUnavailable" model="@("อัตราสำรองคลัง")" /> }
-            </div>
-            <div class="col-6 col-lg-3">
+                else { <partial name="_SectionUnavailable" model="@("คลังเวชภัณฑ์หลัก")" /> }
+
                 @if (s.EdNed is { IsAvailable: true, Value: { } ed })
                 {
                     var total = ed.Sum(r => r.ItemCount);
-                    <div class="metric-card">
-                        <span class="metric-label">สัดส่วนบัญชียา (ED / NED / อื่น)</span>
-                        <span class="metric-value">@total.ToString("N0") <small>รายการ</small></span>
+                    <div class="dashboard-edned">
+                        <span class="dashboard-panel-label">บัญชียา <span class="dashboard-muted">(@total.ToString("N0") รายการ · ไม่รวมยกเลิกใช้ / นอกบัญชี / จัดซื้อเฉพาะราย)</span></span>
                         @if (total > 0)
                         {
                             <div class="composition-bar" role="img" aria-label="@string.Join(", ", ed.Select(r => $"{r.ShortName ?? r.DisplayName} {r.ItemCount}"))">
                                 @foreach (var r in ed) { <span class="composition-seg comp-@((r.ShortName ?? "x").ToLowerInvariant())" style="flex-grow:@r.ItemCount" title="@r.DisplayName @r.ItemCount"></span> }
                             </div>
-                            <ul class="metric-list">
-                                @foreach (var r in ed) { <li><span>@(r.ShortName ?? r.DisplayName)</span><span>@r.ItemCount.ToString("N0") (@((100m * r.ItemCount / total).ToString("N0"))%)</span></li> }
+                            <ul class="dashboard-edned-list">
+                                @foreach (var r in ed) { <li><span class="composition-key comp-@((r.ShortName ?? "x").ToLowerInvariant())" aria-hidden="true"></span>@(r.ShortName ?? r.DisplayName) <strong>@r.ItemCount.ToString("N0")</strong> <span class="dashboard-muted">(@((100m * r.ItemCount / total).ToString("N0"))%)</span></li> }
                             </ul>
                         }
-                        <span class="metric-foot">เกณฑ์เดิม: ไม่รวมยกเลิกใช้ / นอกบัญชี / จัดซื้อเฉพาะราย</span>
                     </div>
                 }
-                else { <partial name="_SectionUnavailable" model="@("สัดส่วนบัญชียา")" /> }
+                else { <partial name="_SectionUnavailable" model="@("บัญชียา")" /> }
+            </div>
+
+            <div class="dashboard-panel dashboard-coverage">
+                @if (s.Coverage is { IsAvailable: true, Value: { } cov })
+                {
+                    <span class="dashboard-panel-label">อัตราสำรองคลัง</span>
+                    @if (cov.HasPeriod && cov.Ratio is { } ratio)
+                    {
+                        <span class="dashboard-panel-value">@ratio.ToString("N2") <small>เดือน</small></span>
+                        <span class="dashboard-panel-sub">งวด @cov.DisplayPeriod</span>
+                        <span class="dashboard-panel-note">มูลค่าคงคลังสิ้นเดือน ÷ มูลค่าจ่าย · ข้อมูลสรุปสิ้นเดือน ไม่ใช่ยอดคงคลังปัจจุบัน</span>
+                    }
+                    else if (cov.HasPeriod)
+                    {
+                        <span class="dashboard-panel-value dashboard-na">N/A</span>
+                        <span class="dashboard-panel-sub">งวด @cov.DisplayPeriod ไม่มียอดจ่าย (หารไม่ได้)</span>
+                    }
+                    else
+                    {
+                        <span class="dashboard-panel-value dashboard-na">ยังไม่มีข้อมูล</span>
+                        <span class="dashboard-panel-sub">ยังไม่มีข้อมูลสรุปรายเดือน (MBS_RE_M)</span>
+                    }
+                }
+                else { <partial name="_SectionUnavailable" model="@("อัตราสำรองคลัง")" /> }
+            </div>
+
+            <div class="dashboard-panel dashboard-substock">
+                @if (s.Substock is { IsAvailable: true, Value: { } sub })
+                {
+                    <span class="dashboard-panel-label">คลังย่อย</span>
+                    <span class="dashboard-panel-value">@sub.TotalValue.ToString("N2") <small>บาท</small></span>
+                    <span class="dashboard-panel-sub">@sub.ByDepartment.Count หน่วยเบิก · @sub.RowCount.ToString("N0") รายการ</span>
+                    @if (sub.ByDepartment.Count > 0)
+                    {
+                        <ul class="dashboard-mini-list">
+                            @foreach (var d in sub.ByDepartment) { <li><span>@d.DisplayName</span><span>@d.TotalValue.ToString("N2")</span></li> }
+                        </ul>
+                    }
+                }
+                else { <partial name="_SectionUnavailable" model="@("คลังย่อย")" /> }
             </div>
         </div>
     </section>
 
-    @* ---------- Procurement / finance ---------- *@
-    <section aria-labelledby="h-proc" class="mb-4">
-        <h2 id="h-proc" class="section-header">การจัดซื้อและการเงิน <span class="section-note">ปีงบประมาณ @s.FiscalYear</span></h2>
-        <div class="row g-2">
-            <div class="col-12 col-lg-3">
-                @if (s.Budget is { IsAvailable: true, Value: { } b })
-                {
-                    <div class="metric-card">
-                        <span class="metric-label">งบประมาณ ปีงบ @b.FiscalYear</span>
-                        @if (b.HasBudget) { <span class="metric-value">@b.TotalMoney!.Value.ToString("N2")</span><span class="metric-foot">บาท · @b.RowCount รายการงบ (BUDGET)</span> }
-                        else { <span class="metric-value metric-na">N/A</span><span class="metric-foot">ไม่มีข้อมูลงบประมาณสำหรับปีนี้</span> }
-                    </div>
-                }
-                else { <partial name="_SectionUnavailable" model="@("งบประมาณ")" /> }
+    @* ---------- C. การจัดซื้อและการเงิน — budget row, pipeline as THE PO representation, supporting rows ---------- *@
+    <section class="dashboard-section dashboard-procurement" aria-labelledby="h-proc">
+        <h2 id="h-proc" class="dashboard-section-title">การจัดซื้อและการเงิน <span class="dashboard-section-note">ปีงบ @s.FiscalYear</span></h2>
+
+        <div class="dashboard-budget-row">
+            @if (s.Budget is { IsAvailable: true, Value: { } b })
+            {
+                <span class="dashboard-panel-label">งบประมาณ</span>
+                @if (b.HasBudget) { <span class="dashboard-inline-value">@b.TotalMoney!.Value.ToString("N2") <small>บาท · @b.RowCount รายการงบ</small></span> }
+                else { <span class="dashboard-inline-value dashboard-na">ยังไม่มีข้อมูลงบประมาณ</span> }
+            }
+            else { <partial name="_SectionUnavailable" model="@("งบประมาณ")" /> }
+        </div>
+
+        @if (s.PurchaseOrders is { IsAvailable: true, Value: { } po })
+        {
+            <div class="dashboard-panel dashboard-pipeline-panel">
+                <span class="dashboard-panel-label">ขั้นตอนใบสั่งซื้อ <span class="dashboard-muted">(@po.Orders.Count.ToString("N0") ใบในปีนี้)</span></span>
+                <ol class="dashboard-pipeline" aria-label="ขั้นตอนใบสั่งซื้อ">
+                    @foreach (var bkt in pipeline)
+                    {
+                        var a = po.Buckets[bkt];
+                        <li class="dashboard-pipeline-step @(a.Count > 0 ? "has-items" : "")">
+                            <a asp-page="/PurchaseOrders/Index" asp-route-fy="@s.FiscalYear" asp-route-bucket="@bkt.ToQueryValue()">
+                                <span class="dashboard-pipeline-label">@StepLabel(bkt)</span>
+                                <span class="dashboard-pipeline-count">@a.Count.ToString("N0")</span>
+                                <span class="dashboard-pipeline-value">@a.TotalValue.ToString("N2")</span>
+                            </a>
+                        </li>
+                    }
+                </ol>
+                @if (po.Orders.Count == 0) { <span class="dashboard-panel-note">ไม่มีใบสั่งซื้อในปีงบประมาณนี้</span> }
             </div>
-            <div class="col-12 col-lg-6">
-                @if (s.PurchaseOrders is { IsAvailable: true, Value: { } po2 })
-                {
-                    <div class="metric-card">
-                        <span class="metric-label">ขั้นตอนใบสั่งซื้อ</span>
-                        <div class="pipeline">
-                            @foreach (var bkt in new[] { PurchaseOrderBucket.Issued, PurchaseOrderBucket.Received, PurchaseOrderBucket.Accounting, PurchaseOrderBucket.Finance, PurchaseOrderBucket.Closed })
-                            {
-                                var a = po2.Buckets[bkt];
-                                <a class="pipeline-step" asp-page="/PurchaseOrders/Index" asp-route-fy="@s.FiscalYear" asp-route-bucket="@bkt.ToQueryValue()">
-                                    <span class="pipeline-label">@bkt.ThaiLabel()</span>
-                                    <span class="pipeline-count">@a.Count.ToString("N0")</span>
-                                    <span class="pipeline-value">@a.TotalValue.ToString("N2")</span>
-                                </a>
-                            }
-                        </div>
-                        @if (po2.Orders.Count == 0) { <span class="metric-foot">ไม่มีใบสั่งซื้อในปีงบประมาณนี้</span> }
-                    </div>
-                }
-                else { <partial name="_SectionUnavailable" model="@("ขั้นตอนใบสั่งซื้อ")" /> }
-            </div>
-            <div class="col-12 col-lg-3">
+        }
+        else { <partial name="_SectionUnavailable" model="@("ขั้นตอนใบสั่งซื้อ")" /> }
+
+        <div class="dashboard-support">
+            <div class="dashboard-panel dashboard-agreements">
                 @if (s.Agreements is { IsAvailable: true, Value: { } ag })
                 {
-                    <div class="metric-card">
-                        <span class="metric-label">สัญญาจะซื้อจะขายคงเหลือ</span>
-                        @if (ag.HasActiveAgreements)
-                        {
-                            <span class="metric-value">@ag.RemainingValue.ToString("N2")</span>
-                            <span class="metric-foot">บาท · @ag.ActiveCount สัญญาที่ยังไม่ครบ/ไม่หมดอายุ@(ag.UnvaluableCount > 0 ? $" · {ag.UnvaluableCount} สัญญาคำนวณมูลค่าไม่ได้" : "")</span>
-                        }
-                        else { <span class="metric-value metric-na">ไม่มีสัญญาคงเหลือ</span><span class="metric-foot">ไม่มีสัญญาที่ยังเปิดอยู่ในตาราง Agreement</span> }
-                    </div>
+                    <span class="dashboard-panel-label">สัญญาจะซื้อจะขายคงเหลือ</span>
+                    @if (ag.HasActiveAgreements)
+                    {
+                        <span class="dashboard-panel-value">@ag.RemainingValue.ToString("N2") <small>บาท</small></span>
+                        <span class="dashboard-panel-sub">@ag.ActiveCount สัญญาที่ยังไม่ครบ/ไม่หมดอายุ@(ag.UnvaluableCount > 0 ? $" · {ag.UnvaluableCount} สัญญาคำนวณมูลค่าไม่ได้" : "")</span>
+                    }
+                    else { <span class="dashboard-panel-value dashboard-na">ไม่มีสัญญาคงเหลือ</span> }
                 }
                 else { <partial name="_SectionUnavailable" model="@("สัญญาคงเหลือ")" /> }
+            </div>
+
+            <div class="dashboard-panel dashboard-process">
                 @if (s.ProcessTime is { IsAvailable: true, Value: { } pt })
                 {
-                    <div class="metric-card mt-2">
-                        <span class="metric-label">ระยะเวลากระบวนการ PO (วัน)</span>
-                        @if (pt.Any(r => r.HasAnyValue))
-                        {
-                            <ul class="metric-list">
-                                @foreach (var r in pt.Where(r => r.HasAnyValue).Take(6))
-                                {
-                                    <li><span>@r.PoMonth</span><span>ส่งของ @(r.SendDays?.ToString("N0") ?? "–") · เอกสาร @(r.DocDays?.ToString("N0") ?? "–") · บัญชี @(r.AccDays?.ToString("N0") ?? "–")</span></li>
-                                }
-                            </ul>
-                        }
-                        else { <span class="metric-value metric-na">N/A</span><span class="metric-foot">ยังไม่มีใบสั่งซื้อที่บันทึกวันที่รับเอกสาร/ส่งเอกสาร/ปิดครบขั้น</span> }
-                    </div>
+                    <span class="dashboard-panel-label">ระยะเวลากระบวนการ PO <span class="dashboard-muted">(วัน)</span></span>
+                    @if (pt.Any(r => r.HasAnyValue))
+                    {
+                        <ul class="dashboard-mini-list">
+                            @foreach (var r in pt.Where(r => r.HasAnyValue).Take(6))
+                            {
+                                <li><span>@r.PoMonth</span><span>ส่งของ @(r.SendDays?.ToString("N0") ?? "–") · เอกสาร @(r.DocDays?.ToString("N0") ?? "–") · บัญชี @(r.AccDays?.ToString("N0") ?? "–")</span></li>
+                            }
+                        </ul>
+                    }
+                    else { <span class="dashboard-panel-value dashboard-na">ยังไม่มีข้อมูล</span><span class="dashboard-panel-sub">ยังไม่มีใบสั่งซื้อที่บันทึกวันที่ครบขั้น</span> }
                 }
+                else { <partial name="_SectionUnavailable" model="@("ระยะเวลากระบวนการ PO")" /> }
+            </div>
+
+            <div class="dashboard-panel dashboard-receipts">
+                @if (s.Receipts is { IsAvailable: true, Value: { } rc })
+                {
+                    <span class="dashboard-panel-label">รับเข้าอื่น / CUP</span>
+                    <span class="dashboard-panel-value">@rc.HeaderCount.ToString("N0") <small>ใบ</small></span>
+                    <span class="dashboard-panel-sub">@rc.LineCount.ToString("N0") รายการ · @rc.TotalValue.ToString("N2") บาท</span>
+                    <a class="dashboard-panel-link" asp-page="/Receipts/Index" asp-route-fy="@s.FiscalYear">ดูรายการ →</a>
+                }
+                else { <partial name="_SectionUnavailable" model="@("รับเข้าอื่น / CUP")" /> }
             </div>
         </div>
     </section>
 
-    @* ---------- Activity ---------- *@
-    <section aria-labelledby="h-move" class="mb-4">
-        <h2 id="h-move" class="section-header">ความเคลื่อนไหวรายเดือน (CARD) <span class="section-note">ปีงบประมาณ @s.FiscalYear · มูลค่า (บาท)</span></h2>
+    @* ---------- D. ความเคลื่อนไหวรายเดือน ---------- *@
+    <section class="dashboard-section dashboard-movement" aria-labelledby="h-move">
+        <h2 id="h-move" class="dashboard-section-title">ความเคลื่อนไหวรายเดือน <span class="dashboard-section-note">ปีงบ @s.FiscalYear · มูลค่า (บาท)</span></h2>
         @if (s.Movement is { IsAvailable: true, Value: { } mv })
         {
-            if (mv.Count == 0) { <div class="empty-state">ไม่มีความเคลื่อนไหวในปีงบประมาณนี้</div> }
+            if (mv.Count == 0) { <div class="ds-empty">ไม่มีความเคลื่อนไหวในปีงบประมาณนี้</div> }
             else
             {
-                <div class="table-responsive">
-                    <table class="table table-sm inv-table w-auto mb-1">
+                var hasOther = mv.Any(m => m.OtherValue != 0);
+                var maxFlow = mv.Max(m => Math.Max(m.ReceiveValue, m.IssueValue));
+                <div class="ds-list dashboard-movement-list">
+                    <table class="ds-table dashboard-movement-table">
                         <caption class="visually-hidden">ความเคลื่อนไหวรายเดือน ปีงบ @s.FiscalYear</caption>
-                        <thead class="table-light"><tr>
-                            <th scope="col">เดือน</th><th scope="col" class="text-end">รับเข้า</th><th scope="col" class="text-end">จ่ายออก</th>
-                            @if (mv.Any(m => m.OtherValue != 0)) { <th scope="col" class="text-end">อื่น ๆ</th> }
-                            <th scope="col" class="text-end">รายการ</th><th scope="col">ประเภท (รหัสเดิม)</th>
+                        <thead><tr>
+                            <th scope="col">เดือน</th>
+                            <th scope="col" class="ds-col-num">รับเข้า</th>
+                            <th scope="col" class="dashboard-bar-col" aria-hidden="true"></th>
+                            <th scope="col" class="ds-col-num">จ่ายออก</th>
+                            <th scope="col" class="dashboard-bar-col" aria-hidden="true"></th>
+                            @if (hasOther) { <th scope="col" class="ds-col-num">อื่น ๆ</th> }
+                            <th scope="col" class="ds-col-num">รายการ</th>
                         </tr></thead>
                         <tbody>
                         @foreach (var m in mv)
                         {
-                            <tr>
-                                <td>@m.DisplayMonth</td>
-                                <td class="text-end">@m.ReceiveValue.ToString("N2")</td>
-                                <td class="text-end">@m.IssueValue.ToString("N2")</td>
-                                @if (mv.Any(x => x.OtherValue != 0)) { <td class="text-end">@m.OtherValue.ToString("N2")</td> }
-                                <td class="text-end">@m.Count.ToString("N0")</td>
-                                <td class="small text-muted">@string.Join(" · ", m.Categories.Select(c => $"{c.Category.Key} {c.Count}"))</td>
+                            <tr class="ds-row">
+                                <td class="dashboard-month">@m.DisplayMonth</td>
+                                <td class="ds-col-num ds-number">@m.ReceiveValue.ToString("N2")</td>
+                                <td class="dashboard-bar-col" aria-hidden="true"><span class="dashboard-bar dashboard-bar--in" style="width:@(maxFlow > 0 ? (100m * m.ReceiveValue / maxFlow).ToString("N0") : "0")%"></span></td>
+                                <td class="ds-col-num ds-number">@m.IssueValue.ToString("N2")</td>
+                                <td class="dashboard-bar-col" aria-hidden="true"><span class="dashboard-bar dashboard-bar--out" style="width:@(maxFlow > 0 ? (100m * m.IssueValue / maxFlow).ToString("N0") : "0")%"></span></td>
+                                @if (hasOther) { <td class="ds-col-num ds-number">@m.OtherValue.ToString("N2")</td> }
+                                <td class="ds-col-num ds-number">@m.Count.ToString("N0")</td>
                             </tr>
                         }
                         </tbody>
-                        <tfoot class="table-light fw-semibold"><tr>
-                            <td>รวม</td><td class="text-end">@mv.Sum(m => m.ReceiveValue).ToString("N2")</td><td class="text-end">@mv.Sum(m => m.IssueValue).ToString("N2")</td>
-                            @if (mv.Any(x => x.OtherValue != 0)) { <td class="text-end">@mv.Sum(m => m.OtherValue).ToString("N2")</td> }
-                            <td class="text-end">@mv.Sum(m => m.Count).ToString("N0")</td><td></td>
+                        <tfoot><tr>
+                            <td>รวม</td>
+                            <td class="ds-col-num ds-number">@mv.Sum(m => m.ReceiveValue).ToString("N2")</td><td></td>
+                            <td class="ds-col-num ds-number">@mv.Sum(m => m.IssueValue).ToString("N2")</td><td></td>
+                            @if (hasOther) { <td class="ds-col-num ds-number">@mv.Sum(m => m.OtherValue).ToString("N2")</td> }
+                            <td class="ds-col-num ds-number">@mv.Sum(m => m.Count).ToString("N0")</td>
                         </tr></tfoot>
                     </table>
                 </div>
-                <p class="small text-muted mb-0">รหัสประเภท = R_S_STATUS + อักษรแรกของเลขที่เอกสาร (RO รับจากใบรับอื่น, RS รับคืนจากคลังย่อย, SS จ่ายให้คลังย่อย, SO จ่ายออกอื่น) — รวมทุกประเภทตามระบบเดิม</p>
+                <details class="ds-help dashboard-movement-detail">
+                    <summary>รายละเอียดประเภท</summary>
+                    <ul class="mb-0 mt-2">
+                        <li>รหัสประเภท = R_S_STATUS + อักษรแรกของเลขที่เอกสาร (RO รับจากใบรับอื่น, RS รับคืนจากคลังย่อย, SS จ่ายให้คลังย่อย, SO จ่ายออกอื่น) — รวมทุกประเภทตามระบบเดิม</li>
+                        @foreach (var m in mv)
+                        {
+                            <li><span class="ds-tabular">@m.DisplayMonth</span>: @string.Join(" · ", m.Categories.Select(c => $"{c.Category.Key} {c.Count} ({c.Category.ThaiLabel})"))</li>
+                        }
+                    </ul>
+                </details>
             }
         }
         else { <partial name="_SectionUnavailable" model="@("ความเคลื่อนไหวรายเดือน")" /> }
     </section>
 
-    @* ---------- Optional item trend ---------- *@
-    <section aria-labelledby="h-item" class="mb-4">
-        <h2 id="h-item" class="section-header">ประวัติการจ่ายรายการยา <span class="section-note">12 เดือนล่าสุด</span></h2>
-        <form method="get" class="d-flex flex-wrap gap-2 align-items-center mb-2" aria-label="เลือกรายการยา">
+    @* ---------- E. ประวัติการจ่ายรายการยา — secondary analytical tool ---------- *@
+    <section class="dashboard-section dashboard-trend" aria-labelledby="h-item">
+        <h2 id="h-item" class="dashboard-section-title">ประวัติการจ่ายรายการยา <span class="dashboard-section-note">12 เดือนล่าสุด</span></h2>
+        <form method="get" class="ds-toolbar dashboard-trend-form" aria-label="เลือกรายการยา">
             <input type="hidden" name="fy" value="@s.FiscalYear" />
             <label for="item" class="visually-hidden">รหัสยา</label>
-            <input class="form-control form-control-sm w-auto inv-code" id="item" name="item" value="@Model.ItemCode" maxlength="7" placeholder="รหัสยา 7 หลัก" autocomplete="off" />
-            <button class="btn btn-sm btn-outline-primary" type="submit">แสดง</button>
-            @if (Model.ItemCode is not null) { <a class="btn btn-sm btn-outline-secondary" asp-page="/Index" asp-route-fy="@s.FiscalYear">ล้าง</a> }
-            <span class="small text-muted">ค้นหารหัสได้จากหน้า <a asp-page="/Inventory/Status">สถานะคงคลัง</a></span>
+            <input class="ds-input dashboard-trend-input" id="item" name="item" value="@Model.ItemCode" maxlength="7" placeholder="รหัสยา 7 หลัก" autocomplete="off" />
+            <button class="ds-btn ds-btn-secondary" type="submit">แสดง</button>
+            @if (Model.ItemCode is not null) { <a class="ds-btn ds-btn-secondary" asp-page="/Index" asp-route-fy="@s.FiscalYear">ล้าง</a> }
+            <span class="dashboard-muted">ค้นหารหัสได้จากหน้า <a asp-page="/Inventory/Status">สถานะคงคลัง</a></span>
         </form>
-        @if (Model.ItemInvalid) { <div class="alert alert-warning py-2 small" role="status">รหัสยาต้องเป็นตัวอักษร/ตัวเลขไม่เกิน 7 ตัว</div> }
-        @if (Model.ItemCode is null) { <div class="empty-state">เลือกรหัสยาเพื่อดูประวัติการจ่ายรายเดือน</div> }
+        @if (Model.ItemInvalid) { <p class="ds-warning" role="status">รหัสยาต้องเป็นตัวอักษร/ตัวเลขไม่เกิน 7 ตัว</p> }
+        @if (Model.ItemCode is null) { <p class="dashboard-quiet">เลือกรหัสยาเพื่อดูประวัติการจ่ายรายเดือน</p> }
         else if (s.ItemTrend is { IsAvailable: true, Value: { } tr })
         {
-            <p class="mb-1"><a asp-page="/Inventory/Detail" asp-route-workingCode="@tr.WorkingCode"><strong class="inv-code">@tr.WorkingCode</strong> @tr.DrugName</a> · คงคลัง @(tr.QtyOnHand?.ToString("N0") ?? "–") @tr.SaleUnit</p>
-            @if (tr.Months.Count == 0) { <div class="empty-state">ไม่มีการจ่ายรายการนี้ใน 12 เดือนล่าสุด</div> }
+            <p class="dashboard-trend-identity"><a class="ds-item-name" asp-page="/Inventory/Detail" asp-route-workingCode="@tr.WorkingCode">@tr.DrugName</a> <span class="dashboard-muted"><span class="ds-code">@tr.WorkingCode</span> · คงคลัง @(tr.QtyOnHand?.ToString("N0") ?? "–") @tr.SaleUnit</span></p>
+            @if (tr.Months.Count == 0) { <div class="ds-empty">ไม่มีการจ่ายรายการนี้ใน 12 เดือนล่าสุด</div> }
             else
             {
                 var max = tr.Months.Max(m => m.SaleQuantity);
-                <div class="table-responsive">
-                    <table class="table table-sm inv-table w-auto">
-                        <thead class="table-light"><tr><th scope="col">เดือน</th><th scope="col" class="text-end">จำนวนจ่าย</th><th scope="col" class="text-end">มูลค่า</th><th scope="col" class="trend-col">สัดส่วน</th></tr></thead>
+                <div class="ds-list dashboard-trend-list">
+                    <table class="ds-table dashboard-trend-table">
+                        <thead><tr><th scope="col">เดือน</th><th scope="col" class="ds-col-num">จำนวนจ่าย</th><th scope="col" class="ds-col-num">มูลค่า</th><th scope="col" class="dashboard-bar-col dashboard-bar-col--wide" aria-hidden="true"></th></tr></thead>
                         <tbody>
                         @foreach (var m in tr.Months)
                         {
-                            <tr>
-                                <td>@(new DashboardMovementMonth(m.MonthKey, []).DisplayMonth)</td>
-                                <td class="text-end">@m.SaleQuantity.ToString("N0")</td>
-                                <td class="text-end">@m.SaleValue.ToString("N2")</td>
-                                <td class="trend-col"><span class="trend-bar" style="width:@(max > 0 ? (100m * m.SaleQuantity / max).ToString("N0") : "0")%" aria-hidden="true"></span></td>
+                            <tr class="ds-row">
+                                <td class="dashboard-month">@(new DashboardMovementMonth(m.MonthKey, []).DisplayMonth)</td>
+                                <td class="ds-col-num ds-number">@m.SaleQuantity.ToString("N0")</td>
+                                <td class="ds-col-num ds-number">@m.SaleValue.ToString("N2")</td>
+                                <td class="dashboard-bar-col dashboard-bar-col--wide" aria-hidden="true"><span class="dashboard-bar dashboard-bar--out" style="width:@(max > 0 ? (100m * m.SaleQuantity / max).ToString("N0") : "0")%"></span></td>
                             </tr>
                         }
                         </tbody>
@@ -328,7 +383,8 @@ else
                 </div>
             }
         }
-        else if (s.ItemTrend is { IsAvailable: true, Value: null }) { <div class="alert alert-secondary py-2" role="status">ไม่พบรหัสยา “@Model.ItemCode” ในคลัง</div> }
+        else if (s.ItemTrend is { IsAvailable: true, Value: null }) { <div class="ds-empty" role="status">ไม่พบรหัสยา “@Model.ItemCode” ในคลัง</div> }
         else { <partial name="_SectionUnavailable" model="@("ประวัติการจ่าย")" /> }
     </section>
 }
+</div>
