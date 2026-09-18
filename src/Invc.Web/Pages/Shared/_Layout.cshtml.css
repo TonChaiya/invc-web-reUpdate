@@ -1,33 +1,31 @@
-﻿/* Please see documentation at https://learn.microsoft.com/aspnet/core/client-side/bundling-and-minification
-for details on configuring this project to bundle and minify static web assets. */
-
-a.navbar-brand {
-  white-space: normal;
-  text-align: center;
-  word-break: break-all;
-}
+﻿/* Layout-scoped styles. The application shell (sidebar, top bar, footer) lives in wwwroot/css/site.css (design tokens).
+   Bootstrap primary overrides use the shared navy tokens so every module inherits the same interaction colour. */
 
 a {
-  color: #0077cc;
+  color: var(--primary, #315f86);
 }
 
 .btn-primary {
   color: #fff;
-  background-color: #1b6ec2;
-  border-color: #1861ac;
+  background-color: var(--primary, #315f86);
+  border-color: var(--primary, #315f86);
+}
+.btn-primary:hover, .btn-primary:focus {
+  background-color: var(--primary-hover, #284f70);
+  border-color: var(--primary-hover, #284f70);
 }
 
 .nav-pills .nav-link.active, .nav-pills .show > .nav-link {
   color: #fff;
-  background-color: #1b6ec2;
-  border-color: #1861ac;
+  background-color: var(--primary, #315f86);
+  border-color: var(--primary, #315f86);
 }
 
 .border-top {
-  border-top: 1px solid #e5e5e5;
+  border-top: 1px solid var(--border, #e3e7ec);
 }
 .border-bottom {
-  border-bottom: 1px solid #e5e5e5;
+  border-bottom: 1px solid var(--border, #e3e7ec);
 }
 
 .box-shadow {
@@ -39,10 +37,15 @@ button.accept-policy {
   line-height: inherit;
 }
 
-.footer {
-  position: absolute;
-  bottom: 0;
-  width: 100%;
-  white-space: nowrap;
-  line-height: 60px;
+/* Footer: never a single non-wrapping line — the old Bootstrap-template rule (white-space: nowrap; position: absolute) made the
+   footer wider than a 375px viewport and caused page-level horizontal scrolling. The footer wraps on every screen size. */
+.app-footer {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 575.98px) {
+  .footer, .app-footer {
+    white-space: normal;
+    line-height: 1.4;
+  }
 }
