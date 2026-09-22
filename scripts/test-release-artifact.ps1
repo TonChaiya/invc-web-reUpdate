@@ -21,7 +21,7 @@ foreach ($p in $forbiddenPatterns) {
     $hits = $files | Where-Object { $_.Name -like $p }
     foreach ($h in $hits) { $failures.Add("forbidden artifact: $($h.FullName.Substring($PublishPath.Length))") }
 }
-foreach ($d in 'Connections','_mmServerScripts','_notes','tests','docs','scripts','Login_v4','login-form-v4') {
+foreach ($d in 'Connections','_mmServerScripts','_notes','tests','docs','scripts','Login_v4','login-form-v4','old-code','.work','.git','src','legacy') {
     if ($dirs | Where-Object { $_.Name -ieq $d }) { $failures.Add("forbidden directory: $d") }
 }
 

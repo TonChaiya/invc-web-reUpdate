@@ -16,3 +16,6 @@ appsettings.*.local.json
 appsettings.Local.json
 *.pfx
 secrets.json
+
+# Local archive of legacy / superseded files (never tracked, built, tested or published)
+/old-code/
