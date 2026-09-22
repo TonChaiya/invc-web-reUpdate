@@ -1,4 +1,4 @@
-@page
+﻿@page
 @using Invc.Core.Dashboard
 @using Invc.Core.PurchaseOrders
 @using Invc.Core.Reorder
@@ -52,59 +52,80 @@ else
     </div>
     @if (s.FiscalYearNote is not null) { <p class="ds-warning" role="status">@s.FiscalYearNote</p> }
 
-    @* ---------- A. งานที่ต้องดำเนินการ — one compact panel, one row = one click target ---------- *@
-    <section class="dashboard-section dashboard-actions" aria-labelledby="h-actions">
-        <h2 id="h-actions" class="dashboard-section-title">งานที่ต้องดำเนินการ</h2>
-        <div class="dashboard-action-panel">
-            @if (s.Reorder is { IsAvailable: true, Value: { } ro })
-            {
-                <a class="dashboard-action-row @(ro.RedCount > 0 ? "is-danger" : "is-ok")" asp-page="/Reorder/Index" asp-route-status="red">
-                    <span class="dashboard-action-mark" aria-hidden="true"></span>
-                    <span class="dashboard-action-title">ต้องสั่งซื้อทันที</span>
-                    <span class="dashboard-action-count">@ro.RedCount.ToString("N0") รายการ</span>
-                    <span class="dashboard-action-support">@(ro.RedCount > 0 ? $"แนะนำสั่ง {ro.RedSuggestedTotal:N0} หน่วย" : "ไม่มีรายการต่ำกว่า MIN")</span>
-                    <span class="dashboard-action-chevron" aria-hidden="true">›</span>
-                </a>
-                @if (ro.YellowCount > 0)
+    @* ---------- A. ภาพรวมคลัง — one inventory summary (value appears once) + supporting panels ---------- *@
+    <section class="dashboard-section dashboard-stock" aria-labelledby="h-stock">
+        <h2 id="h-stock" class="dashboard-section-title">ภาพรวมคลัง <span class="dashboard-section-note">ข้อมูลปัจจุบัน ยกเว้นที่ระบุงวด</span></h2>
+        <div class="dashboard-stock-grid">
+            <div class="dashboard-panel dashboard-summary">
+                @if (s.Inventory is { IsAvailable: true, Value: { } inv })
                 {
-                    <a class="dashboard-action-row is-warning" asp-page="/Reorder/Index" asp-route-status="yellow">
-                        <span class="dashboard-action-mark" aria-hidden="true"></span>
-                        <span class="dashboard-action-title">ใกล้ถึงจุดสั่งซื้อ</span>
-                        <span class="dashboard-action-count">@ro.YellowCount.ToString("N0") รายการ</span>
-                        <span class="dashboard-action-support"></span>
-                        <span class="dashboard-action-chevron" aria-hidden="true">›</span>
-                    </a>
+                    <a class="dashboard-panel-title" asp-page="/Inventory/Status">คลังเวชภัณฑ์หลัก</a>
+                    <div class="ds-summary dashboard-summary-strip">
+                        <span class="ds-stat"><strong>@inv.ActiveItemCount.ToString("N0")</strong> รายการใช้งาน</span>
+                        <span class="ds-stat"><strong>@inv.TotalQtyOnHand.ToString("N0")</strong> หน่วย</span>
+                        <span class="ds-stat">มูลค่า <strong>@inv.TotalValue.ToString("N2")</strong> บาท</span>
+                    </div>
                 }
-            }
-            else { <partial name="_SectionUnavailable" model="@("คำแนะนำการสั่งซื้อ")" /> }
+                else { <partial name="_SectionUnavailable" model="@("คลังเวชภัณฑ์หลัก")" /> }
 
-            @if (s.PurchaseOrders is { IsAvailable: true, Value: { } poA })
-            {
-                @* ใบสั่งซื้อที่ยังดำเนินการ = issued (not cancelled) minus closed — plain arithmetic on the existing buckets *@
-                var issued = poA.Buckets[PurchaseOrderBucket.Issued];
-                var closed = poA.Buckets[PurchaseOrderBucket.Closed];
-                var activeCount = issued.Count - closed.Count;
-                var activeValue = issued.TotalValue - closed.TotalValue;
-                <a class="dashboard-action-row @(activeCount > 0 ? "is-workflow" : "is-ok")" asp-page="/PurchaseOrders/Index" asp-route-fy="@s.FiscalYear" asp-route-bucket="issued">
-                    <span class="dashboard-action-mark" aria-hidden="true"></span>
-                    <span class="dashboard-action-title">ใบสั่งซื้อที่ยังดำเนินการ</span>
-                    <span class="dashboard-action-count">@activeCount.ToString("N0") ใบ</span>
-                    <span class="dashboard-action-support">@activeValue.ToString("N2") บาท@(closed.Count > 0 ? $" · เสร็จสิ้นแล้ว {closed.Count:N0} ใบ" : "")</span>
-                    <span class="dashboard-action-chevron" aria-hidden="true">›</span>
-                </a>
-            }
-            else { <partial name="_SectionUnavailable" model="@("ใบสั่งซื้อ")" /> }
+                @if (s.EdNed is { IsAvailable: true, Value: { } ed })
+                {
+                    var total = ed.Sum(r => r.ItemCount);
+                    <div class="dashboard-edned">
+                        <span class="dashboard-panel-label">บัญชียา <span class="dashboard-muted">(@total.ToString("N0") รายการ · ไม่รวมยกเลิกใช้ / นอกบัญชี / จัดซื้อเฉพาะราย)</span></span>
+                        @if (total > 0)
+                        {
+                            <div class="composition-bar" role="img" aria-label="@string.Join(", ", ed.Select(r => $"{r.ShortName ?? r.DisplayName} {r.ItemCount}"))">
+                                @foreach (var r in ed) { <span class="composition-seg comp-@((r.ShortName ?? "x").ToLowerInvariant())" style="flex-grow:@r.ItemCount" title="@r.DisplayName @r.ItemCount"></span> }
+                            </div>
+                            <ul class="dashboard-edned-list">
+                                @foreach (var r in ed) { <li><span class="composition-key comp-@((r.ShortName ?? "x").ToLowerInvariant())" aria-hidden="true"></span>@(r.ShortName ?? r.DisplayName) <strong>@r.ItemCount.ToString("N0")</strong> <span class="dashboard-muted">(@((100m * r.ItemCount / total).ToString("N0"))%)</span></li> }
+                            </ul>
+                        }
+                    </div>
+                }
+                else { <partial name="_SectionUnavailable" model="@("บัญชียา")" /> }
+            </div>
 
-            @if (s.FailedSectionCount > 0)
-            {
-                <a class="dashboard-action-row is-warning" asp-page="/Health">
-                    <span class="dashboard-action-mark" aria-hidden="true"></span>
-                    <span class="dashboard-action-title">ส่วนที่แสดงข้อมูลไม่ได้</span>
-                    <span class="dashboard-action-count">@s.FailedSectionCount ส่วน</span>
-                    <span class="dashboard-action-support">ตรวจสอบสถานะระบบ</span>
-                    <span class="dashboard-action-chevron" aria-hidden="true">›</span>
-                </a>
-            }
+            <div class="dashboard-panel dashboard-coverage">
+                @if (s.Coverage is { IsAvailable: true, Value: { } cov })
+                {
+                    <span class="dashboard-panel-label">อัตราสำรองคลัง</span>
+                    @if (cov.HasPeriod && cov.Ratio is { } ratio)
+                    {
+                        <span class="dashboard-panel-value">@ratio.ToString("N2") <small>เดือน</small></span>
+                        <span class="dashboard-panel-sub">งวด @cov.DisplayPeriod</span>
+                        <span class="dashboard-panel-note">มูลค่าคงคลังสิ้นเดือน ÷ มูลค่าจ่าย · ข้อมูลสรุปสิ้นเดือน ไม่ใช่ยอดคงคลังปัจจุบัน</span>
+                    }
+                    else if (cov.HasPeriod)
+                    {
+                        <span class="dashboard-panel-value dashboard-na">N/A</span>
+                        <span class="dashboard-panel-sub">งวด @cov.DisplayPeriod ไม่มียอดจ่าย (หารไม่ได้)</span>
+                    }
+                    else
+                    {
+                        <span class="dashboard-panel-value dashboard-na">ยังไม่มีข้อมูล</span>
+                        <span class="dashboard-panel-sub">ยังไม่มีข้อมูลสรุปรายเดือน (MBS_RE_M)</span>
+                    }
+                }
+                else { <partial name="_SectionUnavailable" model="@("อัตราสำรองคลัง")" /> }
+            </div>
+
+            <div class="dashboard-panel dashboard-substock">
+                @if (s.Substock is { IsAvailable: true, Value: { } sub })
+                {
+                    <span class="dashboard-panel-label">คลังย่อย</span>
+                    <span class="dashboard-panel-value">@sub.TotalValue.ToString("N2") <small>บาท</small></span>
+                    <span class="dashboard-panel-sub">@sub.ByDepartment.Count หน่วยเบิก · @sub.RowCount.ToString("N0") รายการ</span>
+                    @if (sub.ByDepartment.Count > 0)
+                    {
+                        <ul class="dashboard-mini-list">
+                            @foreach (var d in sub.ByDepartment) { <li><span>@d.DisplayName</span><span>@d.TotalValue.ToString("N2")</span></li> }
+                        </ul>
+                    }
+                }
+                else { <partial name="_SectionUnavailable" model="@("คลังย่อย")" /> }
+            </div>
         </div>
     </section>
 
@@ -217,80 +238,59 @@ else
         else { <partial name="_SectionUnavailable" model="@("ความเคลื่อนไหวรายเดือน")" /> }
     </section>
 
-    @* ---------- C. ภาพรวมคลัง — one inventory summary (value appears once) + supporting panels ---------- *@
-    <section class="dashboard-section dashboard-stock" aria-labelledby="h-stock">
-        <h2 id="h-stock" class="dashboard-section-title">ภาพรวมคลัง <span class="dashboard-section-note">ข้อมูลปัจจุบัน ยกเว้นที่ระบุงวด</span></h2>
-        <div class="dashboard-stock-grid">
-            <div class="dashboard-panel dashboard-summary">
-                @if (s.Inventory is { IsAvailable: true, Value: { } inv })
+    @* ---------- C. งานที่ต้องดำเนินการ — one compact panel, one row = one click target ---------- *@
+    <section class="dashboard-section dashboard-actions" aria-labelledby="h-actions">
+        <h2 id="h-actions" class="dashboard-section-title">งานที่ต้องดำเนินการ</h2>
+        <div class="dashboard-action-panel">
+            @if (s.Reorder is { IsAvailable: true, Value: { } ro })
+            {
+                <a class="dashboard-action-row @(ro.RedCount > 0 ? "is-danger" : "is-ok")" asp-page="/Reorder/Index" asp-route-status="red">
+                    <span class="dashboard-action-mark" aria-hidden="true"></span>
+                    <span class="dashboard-action-title">ต้องสั่งซื้อทันที</span>
+                    <span class="dashboard-action-count">@ro.RedCount.ToString("N0") รายการ</span>
+                    <span class="dashboard-action-support">@(ro.RedCount > 0 ? $"แนะนำสั่ง {ro.RedSuggestedTotal:N0} หน่วย" : "ไม่มีรายการต่ำกว่า MIN")</span>
+                    <span class="dashboard-action-chevron" aria-hidden="true">›</span>
+                </a>
+                @if (ro.YellowCount > 0)
                 {
-                    <a class="dashboard-panel-title" asp-page="/Inventory/Status">คลังเวชภัณฑ์หลัก</a>
-                    <div class="ds-summary dashboard-summary-strip">
-                        <span class="ds-stat"><strong>@inv.ActiveItemCount.ToString("N0")</strong> รายการใช้งาน</span>
-                        <span class="ds-stat"><strong>@inv.TotalQtyOnHand.ToString("N0")</strong> หน่วย</span>
-                        <span class="ds-stat">มูลค่า <strong>@inv.TotalValue.ToString("N2")</strong> บาท</span>
-                    </div>
+                    <a class="dashboard-action-row is-warning" asp-page="/Reorder/Index" asp-route-status="yellow">
+                        <span class="dashboard-action-mark" aria-hidden="true"></span>
+                        <span class="dashboard-action-title">ใกล้ถึงจุดสั่งซื้อ</span>
+                        <span class="dashboard-action-count">@ro.YellowCount.ToString("N0") รายการ</span>
+                        <span class="dashboard-action-support"></span>
+                        <span class="dashboard-action-chevron" aria-hidden="true">›</span>
+                    </a>
                 }
-                else { <partial name="_SectionUnavailable" model="@("คลังเวชภัณฑ์หลัก")" /> }
+            }
+            else { <partial name="_SectionUnavailable" model="@("คำแนะนำการสั่งซื้อ")" /> }
 
-                @if (s.EdNed is { IsAvailable: true, Value: { } ed })
-                {
-                    var total = ed.Sum(r => r.ItemCount);
-                    <div class="dashboard-edned">
-                        <span class="dashboard-panel-label">บัญชียา <span class="dashboard-muted">(@total.ToString("N0") รายการ · ไม่รวมยกเลิกใช้ / นอกบัญชี / จัดซื้อเฉพาะราย)</span></span>
-                        @if (total > 0)
-                        {
-                            <div class="composition-bar" role="img" aria-label="@string.Join(", ", ed.Select(r => $"{r.ShortName ?? r.DisplayName} {r.ItemCount}"))">
-                                @foreach (var r in ed) { <span class="composition-seg comp-@((r.ShortName ?? "x").ToLowerInvariant())" style="flex-grow:@r.ItemCount" title="@r.DisplayName @r.ItemCount"></span> }
-                            </div>
-                            <ul class="dashboard-edned-list">
-                                @foreach (var r in ed) { <li><span class="composition-key comp-@((r.ShortName ?? "x").ToLowerInvariant())" aria-hidden="true"></span>@(r.ShortName ?? r.DisplayName) <strong>@r.ItemCount.ToString("N0")</strong> <span class="dashboard-muted">(@((100m * r.ItemCount / total).ToString("N0"))%)</span></li> }
-                            </ul>
-                        }
-                    </div>
-                }
-                else { <partial name="_SectionUnavailable" model="@("บัญชียา")" /> }
-            </div>
+            @if (s.PurchaseOrders is { IsAvailable: true, Value: { } poA })
+            {
+                @* ใบสั่งซื้อที่ยังดำเนินการ = issued (not cancelled) minus closed — plain arithmetic on the existing buckets *@
+                var issued = poA.Buckets[PurchaseOrderBucket.Issued];
+                var closed = poA.Buckets[PurchaseOrderBucket.Closed];
+                var activeCount = issued.Count - closed.Count;
+                var activeValue = issued.TotalValue - closed.TotalValue;
+                <a class="dashboard-action-row @(activeCount > 0 ? "is-workflow" : "is-ok")" asp-page="/PurchaseOrders/Index" asp-route-fy="@s.FiscalYear" asp-route-bucket="issued">
+                    <span class="dashboard-action-mark" aria-hidden="true"></span>
+                    <span class="dashboard-action-title">ใบสั่งซื้อที่ยังดำเนินการ</span>
+                    <span class="dashboard-action-count">@activeCount.ToString("N0") ใบ</span>
+                    <span class="dashboard-action-support">@activeValue.ToString("N2") บาท@(closed.Count > 0 ? $" · เสร็จสิ้นแล้ว {closed.Count:N0} ใบ" : "")</span>
+                    <span class="dashboard-action-chevron" aria-hidden="true">›</span>
+                </a>
+            }
+            else { <partial name="_SectionUnavailable" model="@("ใบสั่งซื้อ")" /> }
 
-            <div class="dashboard-panel dashboard-coverage">
-                @if (s.Coverage is { IsAvailable: true, Value: { } cov })
-                {
-                    <span class="dashboard-panel-label">อัตราสำรองคลัง</span>
-                    @if (cov.HasPeriod && cov.Ratio is { } ratio)
-                    {
-                        <span class="dashboard-panel-value">@ratio.ToString("N2") <small>เดือน</small></span>
-                        <span class="dashboard-panel-sub">งวด @cov.DisplayPeriod</span>
-                        <span class="dashboard-panel-note">มูลค่าคงคลังสิ้นเดือน ÷ มูลค่าจ่าย · ข้อมูลสรุปสิ้นเดือน ไม่ใช่ยอดคงคลังปัจจุบัน</span>
-                    }
-                    else if (cov.HasPeriod)
-                    {
-                        <span class="dashboard-panel-value dashboard-na">N/A</span>
-                        <span class="dashboard-panel-sub">งวด @cov.DisplayPeriod ไม่มียอดจ่าย (หารไม่ได้)</span>
-                    }
-                    else
-                    {
-                        <span class="dashboard-panel-value dashboard-na">ยังไม่มีข้อมูล</span>
-                        <span class="dashboard-panel-sub">ยังไม่มีข้อมูลสรุปรายเดือน (MBS_RE_M)</span>
-                    }
-                }
-                else { <partial name="_SectionUnavailable" model="@("อัตราสำรองคลัง")" /> }
-            </div>
-
-            <div class="dashboard-panel dashboard-substock">
-                @if (s.Substock is { IsAvailable: true, Value: { } sub })
-                {
-                    <span class="dashboard-panel-label">คลังย่อย</span>
-                    <span class="dashboard-panel-value">@sub.TotalValue.ToString("N2") <small>บาท</small></span>
-                    <span class="dashboard-panel-sub">@sub.ByDepartment.Count หน่วยเบิก · @sub.RowCount.ToString("N0") รายการ</span>
-                    @if (sub.ByDepartment.Count > 0)
-                    {
-                        <ul class="dashboard-mini-list">
-                            @foreach (var d in sub.ByDepartment) { <li><span>@d.DisplayName</span><span>@d.TotalValue.ToString("N2")</span></li> }
-                        </ul>
-                    }
-                }
-                else { <partial name="_SectionUnavailable" model="@("คลังย่อย")" /> }
-            </div>
+            @if (s.FailedSectionCount > 0)
+            {
+                <a class="dashboard-action-row is-warning" asp-page="/Health">
+                    <span class="dashboard-action-mark" aria-hidden="true"></span>
+                    <span class="dashboard-action-title">ส่วนที่แสดงข้อมูลไม่ได้</span>
+                    <span class="dashboard-action-count">@s.FailedSectionCount ส่วน</span>
+                    <span class="dashboard-action-support">ตรวจสอบสถานะระบบ</span>
+                    <span class="dashboard-action-chevron" aria-hidden="true">›</span>
+                </a>
+            }
         </div>
     </section>
 

@@ -427,8 +427,8 @@ a:focus-visible, button:focus-visible, .btn:focus-visible, .form-control:focus-v
 
 /* ==========================================================================
    Dashboard (ภาพรวม) — operational overview on the shared design system.
-   Operational work screen, no page hero (the shell names the page). Hierarchy: utility row → actions (one compact panel) →
-   monthly movement (main focus, header reads as the equation) → stock overview → procurement → item trend.
+   Operational work screen, no page hero (the shell names the page). Hierarchy: utility row → stock overview →
+   monthly movement (header reads as the equation) → actions (one compact panel) → procurement → item trend.
    No metric-card wall: one fact appears once; sections are light panels or plain groups.
    ========================================================================== */
 .dashboard-utility { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); margin-bottom: var(--sp-3); }

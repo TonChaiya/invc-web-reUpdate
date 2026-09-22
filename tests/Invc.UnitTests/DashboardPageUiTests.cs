@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Text.RegularExpressions;
 using Invc.Core.Dashboard;
 using Invc.Core.Diagnostics;
@@ -150,7 +150,7 @@ public sealed class DashboardPageUiTests : IClassFixture<DashboardPageUiTests.Fa
         Assert.True(actions.Success);
         var move = html.IndexOf("dashboard-section dashboard-movement", StringComparison.Ordinal);
         var stock = html.IndexOf("dashboard-section dashboard-stock", StringComparison.Ordinal);
-        Assert.True(actions.Index < move && move < stock, "actions → monthly movement → stock overview");
+        Assert.True(stock < move && move < actions.Index, "stock overview → monthly movement → actions (owner 2026-09-22)");
         Assert.Contains("<h2 id=\"h-actions\" class=\"dashboard-section-title\">งานที่ต้องดำเนินการ</h2>", actions.Value);
         Assert.Single(Regex.Matches(actions.Value, "class=\"dashboard-action-panel\""));
         Assert.DoesNotContain("dashboard-action-open", actions.Value);
