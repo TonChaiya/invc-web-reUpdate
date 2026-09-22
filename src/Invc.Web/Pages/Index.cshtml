@@ -17,6 +17,8 @@
         PurchaseOrderBucket.Closed => "เสร็จสิ้น",
         _ => b.ThaiLabel(),
     };
+    // per-type colour key (same palette as the บัญชียา composition bar): 1 ED · 2 NED · 3 MES · other codes teal-grey · unknown grey
+    static string TypeTone(string code) => code switch { "1" => "ed", "2" => "ned", "3" => "mes", "?" => "x", _ => "other" };
 }
 
 <div class="dashboard-page ds-page">
@@ -160,10 +162,10 @@ else
                         <caption class="visually-hidden">ความเคลื่อนไหวรายเดือน (ประมวลผล) ปีงบ @s.FiscalYear: ยอดยกมา + รับเข้า − จ่ายออก = คงเหลือ</caption>
                         <thead><tr>
                             <th scope="col" class="dashboard-col-month">เดือน</th>
-                            <th scope="col" class="ds-col-num">ยอดยกมา</th>
-                            <th scope="col" class="ds-col-num"><span class="dashboard-op" aria-hidden="true">+</span> รับเข้า</th>
-                            <th scope="col" class="ds-col-num"><span class="dashboard-op" aria-hidden="true">−</span> จ่ายออก</th>
-                            <th scope="col" class="ds-col-num"><span class="dashboard-op" aria-hidden="true">=</span> คงเหลือ</th>
+                            <th scope="col" class="ds-col-num dashboard-opening">ยอดยกมา</th>
+                            <th scope="col" class="ds-col-num dashboard-receive"><span class="dashboard-op" aria-hidden="true">+</span> รับเข้า</th>
+                            <th scope="col" class="ds-col-num dashboard-issue"><span class="dashboard-op" aria-hidden="true">−</span> จ่ายออก</th>
+                            <th scope="col" class="ds-col-num dashboard-ending"><span class="dashboard-op" aria-hidden="true">=</span> คงเหลือ</th>
                         </tr></thead>
                         <tbody>
                         @{ var first = true; }
@@ -201,8 +203,8 @@ else
                                                 @foreach (var code in new[] { "1", "2" })
                                                 {
                                                     var tt = m.Type(code);
-                                                    <tr class="is-child">
-                                                        <td>@(tt?.Name ?? (code == "1" ? "ยาในบัญชียาหลักแห่งชาติ" : "ยานอกบัญชียาหลักแห่งชาติ")) <span class="dashboard-muted">(@(code == "1" ? "ED" : "NED"))</span></td>
+                                                    <tr class="is-child dashboard-type-@(code == "1" ? "ed" : "ned")">
+                                                        <td><span class="composition-key comp-@(code == "1" ? "ed" : "ned")" aria-hidden="true"></span>@(tt?.Name ?? (code == "1" ? "ยาในบัญชียาหลักแห่งชาติ" : "ยานอกบัญชียาหลักแห่งชาติ")) <span class="dashboard-muted">(@(code == "1" ? "ED" : "NED"))</span></td>
                                                         <td class="ds-col-num ds-number">@(tt?.OpeningValue?.ToString("N2") ?? (m.HasOpening ? "0.00" : "–"))</td>
                                                         <td class="ds-col-num ds-number">@((tt?.ReceiveValue ?? 0m).ToString("N2"))</td>
                                                         <td class="ds-col-num ds-number">@((tt?.IssueValue ?? 0m).ToString("N2"))</td>
@@ -211,8 +213,8 @@ else
                                                 }
                                                 @foreach (var tt in m.Types.Where(x => x.Code != "1" && x.Code != "2" && x.HasAnyValue))
                                                 {
-                                                    <tr class="@(tt.IsUnknown ? "is-unknown" : "")">
-                                                        <td>@tt.Name @if (!tt.IsUnknown) { <span class="dashboard-muted">(@tt.Code)</span> }</td>
+                                                    <tr class="@(tt.IsUnknown ? "is-unknown" : "") dashboard-type-@TypeTone(tt.Code)">
+                                                        <td><span class="composition-key comp-@TypeTone(tt.Code)" aria-hidden="true"></span>@tt.Name @if (!tt.IsUnknown) { <span class="dashboard-muted">(@tt.Code)</span> }</td>
                                                         <td class="ds-col-num ds-number">@(tt.OpeningValue?.ToString("N2") ?? "–")</td>
                                                         <td class="ds-col-num ds-number">@tt.ReceiveValue.ToString("N2")</td>
                                                         <td class="ds-col-num ds-number">@tt.IssueValue.ToString("N2")</td>
