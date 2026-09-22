@@ -1,5 +1,0 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
-<info>
-	<infoitem key="UD_Drug" value="name:WORKING_CODE;datatype:202,name:DRUG_NAME;datatype:202,name:PACK_RATIO;datatype:131,name:SALE_UNIT;datatype:202,name:QTY_ON_HAND;datatype:131,name:LOT_COST;datatype:131,name:EXPIRED_DATE;datatype:135,name:LOCATION;datatype:202,name:VENDOR_CODE;datatype:202,name:MANUFAC_CODE;datatype:202,name:ExpMonth;datatype:5" />
-	<infoitem key="UD_updateddate" value="name:updatedate;datatype:202,name:password;datatype:202" />
-</info>

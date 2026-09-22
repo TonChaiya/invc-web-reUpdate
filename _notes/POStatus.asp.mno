@@ -1,5 +1,0 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
-<info>
-	<infoitem key="UD_Drug" value="name:PONO;datatype:202,name:PODate;datatype:135,name:MaxOfInvoiceNo;datatype:202,name:LastOfInvoiceDate;datatype:202,name:Wcode;datatype:202,name:DRUG_NAME;datatype:202,name:POAmount;datatype:4,name:Rev_No;datatype:5,name:rec_package;datatype:202,name:POUnit;datatype:202" />
-	<infoitem key="UD_updateddate" value="name:updatedate;datatype:202,name:password;datatype:202" />
-</info>
