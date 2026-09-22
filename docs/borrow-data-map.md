@@ -1,6 +1,6 @@
-# Borrow ("ยายืมจากหน่วยงานอื่น") — data map, mirror schema and reconciliation
+﻿# Borrow ("ยายืมจากหน่วยงานอื่น") — data map, mirror schema and reconciliation
 
-Checkpoint 1 (2026-09-17). Source of truth: **SQL Server `INV` — STRICTLY READ-ONLY** (SELECT only). Application-owned store:
+Checkpoint 1 (2026-09-17); live facts re-verified 2026-09-22 (unchanged: 45 bills / 121 lines / Σ 177,132; CUB001 44 bills latest 2026-08-24, PAO001 1 bill; 0 duplicate RECEIVE_NO; all quantities integers 1–10,000, packs 1–1,000). Return workflow: `docs/borrow-workflow.md`. Source of truth: **SQL Server `INV` — STRICTLY READ-ONLY** (SELECT only). Application-owned store:
 **MySQL `invc_web`** (Laragon MySQL 8.4.3, writable) holding a mirror of the type-09 receipts. Live proof: `.work/borrow-foundation/live-proof.txt`.
 
 ## 1. Source tables and keys (INV, verified via `sys.columns` 2026-09-17)
@@ -48,7 +48,9 @@ application is `BorrowMirrorSql` (INSERT … ON DUPLICATE KEY UPDATE / DELETE on
 `IAppDbConnectionFactory` (MySqlConnector), whose connection string is refused if it names database `INV`, uses SQL Server keywords
 (`Initial Catalog`, `Integrated Security`, `Data Source`, `ApplicationIntent`) or the login `sa`. Unit tests pin all of this.
 
-## 6. Not implemented in checkpoint 1 (future checkpoints)
-1. **Return confirmation workflow** (returned / not returned per item or bill) — needs application-owned status tables.
-2. **Incoming non-borrow receipt alert** (new type-01/05/10/11… receipts that may correspond to a borrow).
-3. **Return history / audit** (who confirmed what, when).
+## 6. Implemented 2026-09-22 (migration 002, `docs/borrow-workflow.md`)
+1. Return workflow per item / per bill with partial returns, derived statuses (ค้างคืน / คืนบางส่วน / คืนครบ / ต้องตรวจสอบ) — `borrow_return_event`, append-only.
+2. Incoming non-borrow receipt advisory ("มีการรับเข้าหลังยืม") — INV read-only, set-based, informational only.
+3. Return history / audit with corrections (reversal events), actor = authenticated name or `anonymous:<ip>` fallback.
+4. `/Health` reports MySQL `invc_web` (state, schema version, last mirror sync) independently of INV.
+Additional live fact used by the advisory: `RCV_TYPE` codes with headers today — 01 (4), 05 (26), 08 (1), 09 (45), 10 (11), 11 (16), 12 (5), 13 (2); 375 non-09 receipt lines match an outstanding borrow line's WORKING_CODE on/after its borrow date (119 of 121 lines).

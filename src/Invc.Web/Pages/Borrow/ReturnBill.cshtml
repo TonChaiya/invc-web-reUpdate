@@ -1,0 +1,86 @@
+@page "{billRecordNumber:int}"
+@using Invc.Core.Borrow
+@model Invc.Web.Pages.Borrow.ReturnBillModel
+@{
+    ViewData["Title"] = "คืนครบทั้งบิล";
+    ViewData["HideNavSearch"] = true;
+    var bill = Model.Bill;
+}
+
+<div class="borrow-page ds-page borrow-form-page">
+    <nav class="borrow-breadcrumb" aria-label="breadcrumb">
+        <a asp-page="/Borrow/Index">ยายืม</a> <span aria-hidden="true">/</span>
+        @if (bill is not null) { <a asp-page="/Borrow/Facility" asp-route-facilityCode="@bill.Source.FacilityCode">@(bill.Source.FacilityName ?? bill.Source.FacilityCode)</a> <span aria-hidden="true">/</span> }
+        <span>คืนครบทั้งบิล</span>
+    </nav>
+
+    @if (Model.StoreUnavailable || bill is null)
+    {
+        <h1 class="borrow-title">คืนครบทั้งบิล</h1>
+        <div class="ds-error" role="alert">@(Model.Error ?? Invc.Web.Borrow.BorrowScreenService.StoreError) — ดู <a asp-page="/Health">สถานะระบบ</a></div>
+    }
+    else
+    {
+        <div class="borrow-header">
+            <div>
+                <h1 class="borrow-title">คืนครบทั้งบิล<span class="borrow-title-code">@bill.Source.ReceiveNo</span></h1>
+                <p class="borrow-subtitle ds-identity">
+                    <span>@(bill.Source.FacilityName ?? bill.Source.FacilityCode)</span><span class="dot"></span>
+                    <span>รับ @(bill.Source.DateReceive?.ToString("d MMM yyyy") ?? "–")</span>
+                    @if (!string.IsNullOrWhiteSpace(bill.Source.InvoiceNo)) { <span class="dot"></span><span>เอกสาร @bill.Source.InvoiceNo</span> }
+                </p>
+            </div>
+        </div>
+
+        <section class="ds-detail-summary borrow-figures" aria-label="ยอดปัจจุบันของบิล">
+            <div class="ds-kpi"><span class="ds-kpi-label">ยืม</span><span class="ds-kpi-value">@bill.BorrowedQty.ToString("N0")</span></div>
+            <div class="ds-kpi"><span class="ds-kpi-label">คืนแล้ว</span><span class="ds-kpi-value">@bill.ReturnedQty.ToString("N0")</span></div>
+            <div class="ds-kpi"><span class="ds-kpi-label">คงค้างที่จะบันทึกคืน</span><span class="ds-kpi-value borrow-num--attention">@bill.OutstandingQty.ToString("N0")</span></div>
+            <div class="ds-kpi"><span class="ds-kpi-label">รายการที่จะคืน</span><span class="ds-kpi-value">@Model.OpenItems.Count.ToString("N0") <small>/ @bill.ItemCount</small></span></div>
+        </section>
+
+        @if (Model.Error is not null) { <div class="ds-error" role="alert">@Model.Error</div> }
+
+        @if (!bill.CanReturnAll)
+        {
+            <div class="borrow-empty" role="status">@(bill.HasConflict ? "บิลนี้มีรายการที่ต้องตรวจสอบ ไม่สามารถคืนครบทั้งบิลได้" : "บิลนี้คืนครบแล้ว")</div>
+        }
+        else
+        {
+            <div class="ds-list borrow-confirm-list">
+                <table class="ds-table">
+                    <caption class="visually-hidden">รายการที่จะบันทึกคืน</caption>
+                    <thead><tr><th scope="col">รายการยา</th><th scope="col" class="ds-col-num">ยืม</th><th scope="col" class="ds-col-num">คืนแล้ว</th><th scope="col" class="ds-col-num">จะบันทึกคืน</th></tr></thead>
+                    <tbody>
+                    @foreach (var i in Model.OpenItems)
+                    {
+                        <tr class="ds-row"><td><div class="ds-item-name">@i.DisplayName</div><div class="ds-item-meta"><span>@i.Source.WorkingCode</span>@if (!string.IsNullOrWhiteSpace(i.Source.LotNo)) { <span class="dot"></span><span>Lot @i.Source.LotNo</span> }</div></td>
+                            <td class="ds-col-num ds-number">@i.BorrowedQty.ToString("N0")</td><td class="ds-col-num ds-number">@i.ReturnedQty.ToString("N0")</td>
+                            <td class="ds-col-num ds-number borrow-num--attention"><strong>@i.OutstandingQty.ToString("N0")</strong></td></tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+
+            <form method="post" class="ds-detail-section borrow-form" asp-route-billRecordNumber="@Model.BillRecordNumber">
+                <input type="hidden" asp-for="Form.ClientRequestId" />
+                <div class="borrow-form-grid">
+                    <div class="borrow-field">
+                        <label for="at">วันที่-เวลาคืน</label>
+                        <input class="ds-input" id="at" asp-for="Form.EventAt" type="datetime-local" value="@((Model.Form.EventAt ?? Model.Now).ToString("yyyy-MM-dd'T'HH:mm"))" max="@Model.Now.AddMinutes(5).ToString("yyyy-MM-dd'T'HH:mm")" />
+                    </div>
+                    <div class="borrow-field borrow-field--wide">
+                        <label for="note">หมายเหตุ <span class="ds-note">(ไม่บังคับ)</span></label>
+                        <input class="ds-input" id="note" asp-for="Form.Note" maxlength="@BorrowReturnRules.MaxNoteLength" />
+                    </div>
+                </div>
+                <label class="borrow-confirm"><input type="checkbox" asp-for="Form.Confirm" /> ยืนยันบันทึกคืนครบทั้งบิล @bill.Source.ReceiveNo จำนวนคงค้างทั้งหมด <strong class="ds-tabular">@bill.OutstandingQty.ToString("N0")</strong> (@Model.OpenItems.Count รายการ)</label>
+                <div class="borrow-form-actions">
+                    <button class="ds-btn ds-btn-primary" type="submit">บันทึกคืนครบทั้งบิล</button>
+                    <a class="ds-btn ds-btn-secondary" asp-page="/Borrow/Facility" asp-route-facilityCode="@bill.Source.FacilityCode" asp-route-status="all">ยกเลิก</a>
+                </div>
+                <p class="ds-note">ทุกรายการถูกบันทึกในครั้งเดียว — ถ้ารายการใดไม่ผ่านการตรวจสอบ จะไม่บันทึกทั้งบิล</p>
+            </form>
+        }
+    }
+</div>

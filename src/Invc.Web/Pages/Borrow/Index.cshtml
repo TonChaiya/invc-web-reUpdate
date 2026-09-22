@@ -1,13 +1,13 @@
-@page
+﻿@page
 @using Invc.Core.Borrow
 @model Invc.Web.Pages.Borrow.IndexModel
 @{
     ViewData["Title"] = "ยายืม";
     ViewData["HideNavSearch"] = true;
-    var o = Model.Overview;
+    var filters = new[] { BorrowStatusFilter.Outstanding, BorrowStatusFilter.Partial, BorrowStatusFilter.Returned, BorrowStatusFilter.All };
 }
 
-<div class="borrow-page">
+<div class="borrow-page ds-page">
     <div class="borrow-header">
         <div>
             <h1 class="borrow-title">ยายืม</h1>
@@ -19,70 +19,92 @@
                 <span>ซิงก์ INV <time datetime="@s.SyncedAt.ToString("s")">@s.SyncedAt.ToString("d MMM yyyy HH:mm")</time></span>
                 <span>ใหม่ @s.Inserted.ToString("N0") · แก้ไข @s.Updated.ToString("N0") · ลบ @s.Deleted.ToString("N0")</span>
             }
-            @if (Model.SyncError is not null)
-            {
-                <span class="borrow-sync-warning" role="status">@Model.SyncError</span>
-            }
+            @if (Model.SyncError is not null) { <span class="borrow-sync-warning" role="status">@Model.SyncError</span> }
+            <a class="borrow-history-link" asp-page="/Borrow/History">ประวัติการคืน</a>
         </div>
     </div>
 
+    @if (Model.Notice is not null) { <div class="ds-notice" role="status">@Model.Notice</div> }
+
     @if (Model.HasError)
     {
-        <div class="alert alert-danger" role="alert">ไม่สามารถอ่านข้อมูลยายืมจากฐานข้อมูลของเว็บได้ กรุณาตรวจสอบหน้า <a asp-page="/Health" class="alert-link">สถานะระบบ</a></div>
+        <div class="ds-error" role="alert">@Model.ErrorMessage — ดู <a asp-page="/Health">สถานะระบบ</a></div>
     }
     else
     {
         <div class="borrow-summary" role="group" aria-label="สรุป">
-            <span class="borrow-stat">รายการยืม <strong>@o.ItemCount.ToString("N0")</strong></span>
-            <span class="borrow-stat">สถานบริการ <strong>@o.FacilityCount.ToString("N0")</strong></span>
-            <span class="borrow-stat">บิลที่เกี่ยวข้อง <strong>@o.BillCount.ToString("N0")</strong></span>
-            <span class="borrow-stat">จำนวนรวม <strong>@o.TotalQty.ToString("N0")</strong> หน่วย</span>
+            <span class="borrow-stat">สถานบริการ <strong>@Model.Board.FacilityCount.ToString("N0")</strong></span>
+            <span class="borrow-stat">บิล <strong>@Model.Board.BillCount.ToString("N0")</strong> <small>(ค้าง @Model.Board.OpenBillCount.ToString("N0"))</small></span>
+            <span class="borrow-stat">จำนวนที่ยืม <strong>@Model.Board.BorrowedQty.ToString("N0")</strong></span>
+            <span class="borrow-stat">คืนแล้ว <strong>@Model.Board.ReturnedQty.ToString("N0")</strong></span>
+            <span class="borrow-stat borrow-stat--attention">คงค้าง <strong>@Model.Board.OutstandingQty.ToString("N0")</strong></span>
+            @if (Model.Board.ConflictCount > 0) { <span class="borrow-stat borrow-stat--conflict">ต้องตรวจสอบ <strong>@Model.Board.ConflictCount.ToString("N0")</strong> รายการ</span> }
         </div>
 
+        @* status = the ONE primary selector (owner rule); outstanding work first *@
+        <nav class="borrow-tabs" aria-label="เลือกสถานะ">
+            @foreach (var f in filters)
+            {
+                var active = Model.Filter == f;
+                <a class="borrow-tab @(active ? "is-active" : "") is-@f.ToQueryValue()" asp-page="/Borrow/Index" asp-route-status="@f.ToQueryValue()" asp-route-q="@Model.Keyword" aria-current="@(active ? "page" : null)">
+                    <span>@f.ThaiLabel()</span><span class="borrow-tab-count">@Model.CountFor(f).ToString("N0")</span>
+                </a>
+            }
+        </nav>
+
         <form method="get" class="borrow-toolbar" role="search" aria-label="ค้นหา">
+            <input type="hidden" name="status" value="@Model.Filter.ToQueryValue()" />
             <label class="visually-hidden" for="q">ค้นหา</label>
             <input class="ds-input" type="search" id="q" name="q" value="@Model.Keyword"
                    maxlength="@Invc.Core.Inventory.SearchKeyword.MaxLength" autocomplete="off"
-                   placeholder="ค้นหายา รหัสยา หรือเลขบิล" />
+                   placeholder="ค้นหาสถานบริการ เลขบิล เลขเอกสาร รหัสยา หรือชื่อยา" />
             <button class="ds-btn ds-btn-primary" type="submit">ค้นหา</button>
-            @if (Model.Keyword is not null)
-            {
-                <a class="ds-btn ds-btn-secondary" asp-page="/Borrow/Index">ล้าง</a>
-            }
+            @if (Model.Keyword is not null) { <a class="ds-btn ds-btn-secondary" asp-page="/Borrow/Index" asp-route-status="@Model.Filter.ToQueryValue()">ล้าง</a> }
         </form>
 
-        <p class="borrow-result-meta">
-            @o.FacilityCount.ToString("N0") สถานบริการ
+        <p class="borrow-result-meta" aria-live="polite">
+            <strong>@Model.Filter.ThaiLabel()</strong> · @Model.Facilities.Count.ToString("N0") สถานบริการ
             @if (Model.Keyword is not null) { <text>· ค้นหา “@Model.Keyword”</text> }
         </p>
 
-        @if (o.Facilities.Count == 0)
+        @if (Model.Facilities.Count == 0)
         {
-            <div class="borrow-empty" role="status">@(Model.Keyword is null ? "ยังไม่มีรายการยายืม (ประเภท 09) ใน INVC" : $"ไม่พบสถานบริการที่ตรงกับ “{Model.Keyword}”")</div>
+            <div class="borrow-empty" role="status">
+                @if (Model.Board.FacilityCount == 0) { <text>ยังไม่มีรายการยายืม (ประเภท 09) ใน INVC</text> }
+                else if (Model.Keyword is not null) { <text>ไม่พบสถานบริการที่ตรงกับ “@Model.Keyword”</text> }
+                else { <text>ไม่มีสถานบริการในสถานะ “@Model.Filter.ThaiLabel()”</text> }
+            </div>
         }
         else
         {
             <div class="borrow-facility-list" role="list" aria-label="สถานบริการที่ให้ยืมยา">
                 <div class="borrow-facility-head" aria-hidden="true">
                     <span>สถานบริการ</span>
-                    <span class="borrow-num">บิล</span>
-                    <span class="borrow-num borrow-col-items">รายการ</span>
-                    <span class="borrow-num">จำนวน</span>
-                    <span class="borrow-date">ล่าสุด</span>
+                    <span class="borrow-num">บิลค้าง</span>
+                    <span class="borrow-num">ยืม</span>
+                    <span class="borrow-num borrow-col-returned">คืนแล้ว</span>
+                    <span class="borrow-num">คงค้าง</span>
+                    <span class="borrow-date">ยืมล่าสุด</span>
+                    <span class="borrow-status-col">สถานะ</span>
                     <span></span>
                 </div>
-                @foreach (var f in o.Facilities)
+                @foreach (var f in Model.Facilities)
                 {
-                    <a class="borrow-facility-row" role="listitem" asp-page="/Borrow/Facility" asp-route-facilityCode="@f.FacilityCode">
+                    <a class="borrow-facility-row@(f.HasConflict ? " has-conflict" : "")" role="listitem" asp-page="/Borrow/Facility" asp-route-facilityCode="@f.FacilityCode" asp-route-status="@(Model.Filter == BorrowStatusFilter.All ? "all" : Model.Filter.ToQueryValue())">
                         <span>
                             <span class="borrow-facility-name">@f.DisplayName</span>
-                            <span class="borrow-facility-code">@f.FacilityCode</span>
-                            <span class="borrow-facility-sub">@f.ItemCount.ToString("N0") รายการ · ล่าสุด @(f.LatestDateReceive?.ToString("d MMM yyyy") ?? "–")</span>
+                            <span class="borrow-facility-code">@f.FacilityCode · @f.BillCount.ToString("N0") บิล · @f.ItemCount.ToString("N0") รายการ</span>
+                            <span class="borrow-facility-sub">ค้าง @f.OpenBillCount.ToString("N0") บิล · คงค้าง @f.OutstandingQty.ToString("N0") · ล่าสุด @(f.LatestDateReceive?.ToString("d MMM yyyy") ?? "–")</span>
                         </span>
-                        <span class="borrow-num">@f.BillCount.ToString("N0")</span>
-                        <span class="borrow-num borrow-col-items">@f.ItemCount.ToString("N0")</span>
-                        <span class="borrow-num">@f.TotalQty.ToString("N0")<small>หน่วย</small></span>
+                        <span class="borrow-num">@f.OpenBillCount.ToString("N0")</span>
+                        <span class="borrow-num">@f.BorrowedQty.ToString("N0")</span>
+                        <span class="borrow-num borrow-col-returned">@f.ReturnedQty.ToString("N0")</span>
+                        <span class="borrow-num @(f.OutstandingQty > 0m ? "borrow-num--attention" : "borrow-num--done")">@f.OutstandingQty.ToString("N0")</span>
                         <span class="borrow-date">@(f.LatestDateReceive?.ToString("d MMM yyyy") ?? "–")</span>
+                        <span class="borrow-status-col">
+                            @if (f.HasConflict) { <span class="status-chip status-review">ต้องตรวจสอบ</span> }
+                            else { <span class="status-chip @f.Status.ChipClass()">@f.Status.ThaiLabel()</span> }
+                        </span>
                         <svg class="borrow-facility-arrow" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M8 5l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     </a>
                 }
@@ -92,10 +114,9 @@
         <details class="borrow-help">
             <summary>ที่มาของข้อมูล</summary>
             <ul class="mb-0 mt-2">
-                <li>หัวบิล = INV.OTH_IVO ที่ RCV_TYPE = 09 (ยายืมจากหน่วยงานอื่น) · รายการ = INV.OTH_IVOC ที่ RECEIVE_NO เดียวกัน</li>
-                <li>สถานบริการ = DPT_CODE → COMPANY · ชื่อยา = WORKING_CODE → INV_MD</li>
-                <li>ทุกครั้งที่เปิดหน้านี้ ระบบอ่านข้อมูลประเภท 09 ทั้งหมดจาก INV แล้วปรับสำเนาให้ตรง (เพิ่ม/แก้ไข/ลบ) — INV ไม่ถูกแก้ไข</li>
-                <li>ขั้นตอนยืนยันการคืนและประวัติการคืนยังไม่เปิดใช้ในเวอร์ชันนี้</li>
+                <li>รายการยืม = ใบรับประเภท 09 (ยายืมจากหน่วยงานอื่น) ใน INVC · จำนวนที่ยืม = จำนวนในใบรับ · สถานบริการ = หน่วยงานผู้ให้ยืม</li>
+                <li>คืนแล้ว = ผลรวมการบันทึกคืนในระบบนี้ (แก้ไขได้ด้วยรายการย้อนกลับ ไม่ลบประวัติ) · คงค้าง = ยืม − คืนแล้ว</li>
+                <li>ทุกครั้งที่เปิดหน้านี้ ระบบอ่านข้อมูลประเภท 09 ทั้งหมดจาก INV แล้วปรับข้อมูลสำเนาให้ตรง — INV ไม่ถูกแก้ไข</li>
             </ul>
         </details>
     }

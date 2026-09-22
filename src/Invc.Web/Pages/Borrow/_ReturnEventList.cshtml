@@ -1,0 +1,45 @@
+@using Invc.Core.Borrow
+@model IReadOnlyList<BorrowReturnEvent>
+@*
+    Return / correction trail (newest first). Shared by /Borrow/History, /Borrow/Return/{item} and /Borrow/Correct/{event}.
+    A RETURN event that still has reversible quantity offers the restrained "ย้อนกลับ" link; corrections are never editable.
+*@
+<div class="ds-list borrow-history-list">
+    <table class="ds-table borrow-history-table">
+        <caption class="visually-hidden">ประวัติการคืนและการแก้ไข</caption>
+        <thead><tr>
+            <th scope="col">วันที่-เวลา</th>
+            <th scope="col">ประเภท</th>
+            <th scope="col">สถานบริการ / บิล</th>
+            <th scope="col">รายการยา</th>
+            <th scope="col" class="ds-col-num">จำนวน</th>
+            <th scope="col" class="ds-col-secondary">ผู้บันทึก</th>
+            <th scope="col" class="ds-col-secondary">หมายเหตุ</th>
+            <th scope="col"><span class="visually-hidden">การทำงาน</span></th>
+        </tr></thead>
+        <tbody>
+        @foreach (var e in Model)
+        {
+            var isReturn = e.EventType == BorrowReturnEventType.Return;
+            <tr class="ds-row borrow-event @(isReturn ? "is-return" : "is-correction")" id="event-@e.Id">
+                <td class="ds-tabular borrow-event-time">@e.EventAt.ToString("d MMM yyyy HH:mm")
+                    <div class="ds-item-meta">บันทึก @e.CreatedAt.ToString("d MMM yy HH:mm")</div></td>
+                <td>
+                    @if (isReturn) { <span class="status-chip status-returned">คืน</span> }
+                    else { <span class="status-chip status-review">แก้ไข</span> <div class="ds-item-meta">ย้อนกลับรายการ #@e.CorrectsEventId</div> }
+                </td>
+                <td><div class="borrow-event-facility">@(e.FacilityName ?? e.FacilityCode ?? "–")</div>
+                    <div class="ds-item-meta"><a asp-page="/Borrow/History" asp-route-receiveNo="@e.ReceiveNo">@e.ReceiveNo</a></div></td>
+                <td><div>@(string.IsNullOrWhiteSpace(e.DrugName) ? e.WorkingCode : e.DrugName)</div><div class="ds-item-meta">@e.WorkingCode</div></td>
+                <td class="ds-col-num ds-number @(isReturn ? "borrow-num--done" : "borrow-num--attention")">@(isReturn ? "+" : "")@e.QuantityDelta.ToString("N0")</td>
+                <td class="ds-col-secondary borrow-event-actor">@e.Actor</td>
+                <td class="ds-col-secondary borrow-event-note">@(e.Note ?? "–")</td>
+                <td class="borrow-event-actions">
+                    @if (isReturn && e.ReversibleQty > 0m) { <a class="borrow-inline-action" asp-page="/Borrow/Correct" asp-route-eventId="@e.Id">ย้อนกลับ…</a> }
+                    else if (isReturn) { <span class="ds-note">ย้อนกลับครบแล้ว</span> }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>

@@ -37,6 +37,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<DashboardService>();
         services.AddScoped<IDatabaseHealth, DatabaseHealth>();
         services.AddScoped<IBorrowSourceRepository, BorrowSourceRepository>();   // INV, SELECT only
+        services.AddScoped<IBorrowReceiptAdvisoryRepository, BorrowReceiptAdvisoryRepository>();   // INV, SELECT only (advisory hints)
         return services;
     }
 
@@ -49,6 +50,8 @@ public static class ServiceCollectionExtensions
         services.Configure<AppDatabaseOptions>(configuration.GetSection(AppDatabaseOptions.SectionName));
         services.AddSingleton<IAppDbConnectionFactory, MySqlAppDbConnectionFactory>();
         services.AddScoped<IBorrowMirrorRepository, BorrowMirrorRepository>();
+        services.AddScoped<IBorrowReturnRepository, BorrowReturnRepository>();
+        services.AddScoped<IAppDatabaseHealth, AppDatabaseHealth>();
         services.AddScoped<BorrowSyncService>();
         return services;
     }

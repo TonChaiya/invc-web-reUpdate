@@ -1,0 +1,64 @@
+@page
+@using Invc.Core.Borrow
+@model Invc.Web.Pages.Borrow.HistoryModel
+@{
+    ViewData["Title"] = "ประวัติการคืนยายืม";
+    ViewData["HideNavSearch"] = true;
+}
+
+<div class="borrow-page ds-page">
+    <nav class="borrow-breadcrumb" aria-label="breadcrumb">
+        <a asp-page="/Borrow/Index">ยายืม</a> <span aria-hidden="true">/</span> <span>ประวัติการคืน</span>
+    </nav>
+    <div class="borrow-header">
+        <div>
+            <h1 class="borrow-title">ประวัติการคืน</h1>
+            <p class="borrow-subtitle">รายการบันทึกคืนและการแก้ไขทั้งหมด (ใหม่สุดก่อน) — ประวัติไม่ถูกลบ การแก้ไขสร้างรายการย้อนกลับใหม่</p>
+        </div>
+    </div>
+
+    @if (Model.Notice is not null) { <div class="ds-notice" role="status">@Model.Notice</div> }
+
+    @if (Model.HasError)
+    {
+        <div class="ds-error" role="alert">@Invc.Web.Borrow.BorrowScreenService.StoreError — ดู <a asp-page="/Health">สถานะระบบ</a></div>
+    }
+    else
+    {
+        <form method="get" class="borrow-toolbar borrow-history-filter" role="search" aria-label="กรองประวัติ">
+            <label class="visually-hidden" for="facility">สถานบริการ</label>
+            <select class="ds-select" id="facility" name="facility">
+                <option value="">ทุกสถานบริการ</option>
+                @foreach (var f in Model.Facilities) { <option value="@f.Code" selected="@(f.Code == Model.Facility)">@f.Name (@f.Code)</option> }
+            </select>
+            <label class="visually-hidden" for="receiveNo">เลขบิล</label>
+            <input class="ds-input borrow-input-short" id="receiveNo" name="receiveNo" value="@Model.ReceiveNo" placeholder="เลขบิล" maxlength="20" />
+            <label class="visually-hidden" for="item">รายการยา</label>
+            <input class="ds-input" id="item" name="item" value="@Model.Item" placeholder="รหัสยา / ชื่อยา" maxlength="@Invc.Core.Inventory.SearchKeyword.MaxLength" />
+            <label class="visually-hidden" for="from">ตั้งแต่</label>
+            <input class="ds-input borrow-input-date" id="from" name="from" type="date" value="@Model.From?.ToString("yyyy-MM-dd")" />
+            <label class="visually-hidden" for="to">ถึง</label>
+            <input class="ds-input borrow-input-date" id="to" name="to" type="date" value="@Model.To?.ToString("yyyy-MM-dd")" />
+            <label class="visually-hidden" for="actor">ผู้บันทึก</label>
+            <input class="ds-input borrow-input-short" id="actor" name="actor" value="@Model.Actor" placeholder="ผู้บันทึก" maxlength="@Invc.Core.Inventory.SearchKeyword.MaxLength" />
+            <button class="ds-btn ds-btn-primary" type="submit">กรอง</button>
+            @if (Model.IsFiltered) { <a class="ds-btn ds-btn-secondary" asp-page="/Borrow/History">ล้าง</a> }
+        </form>
+
+        <div class="borrow-summary" role="group" aria-label="สรุป">
+            <span class="borrow-stat">รายการ <strong>@Model.Events.Count.ToString("N0")</strong></span>
+            <span class="borrow-stat">คืนรวม <strong>@Model.ReturnedTotal.ToString("N0")</strong></span>
+            @if (Model.CorrectedTotal > 0m) { <span class="borrow-stat">ย้อนกลับรวม <strong>@Model.CorrectedTotal.ToString("N0")</strong></span> }
+        </div>
+
+        @if (Model.Events.Count == 0)
+        {
+            <div class="borrow-empty" role="status">@(Model.IsFiltered ? "ไม่พบประวัติที่ตรงกับตัวกรอง" : "ยังไม่มีการบันทึกคืน")</div>
+        }
+        else
+        {
+            <partial name="_ReturnEventList" model="Model.Events" />
+            @if (Model.Events.Count >= 500) { <p class="ds-note">แสดง 500 รายการล่าสุด — ใช้ตัวกรองเพื่อดูรายการเก่ากว่านี้</p> }
+        }
+    }
+</div>

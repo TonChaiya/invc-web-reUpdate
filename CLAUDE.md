@@ -8,7 +8,7 @@ same directory is kept as reference only.
 ## Absolute boundaries (owner-mandated — never relax)
 - Modify files **only** under `C:\INVC\Web`. Nothing else: no `C:\INVC\*.mdb`, IIS, services, registry, machine/user env vars, global NuGet/git config.
 - SQL Server `INV` is **STRICTLY READ-ONLY**: `SELECT` and catalog queries only. No DML/DDL, no logins/permissions, no migrations, no seeding, no auto-initialisation. The app adapts to the schema; never the reverse. If a change seems needed → document as BLOCKED / DESIGN ISSUE.
-- **Application-owned MySQL `invc_web`** (Laragon MySQL, section `AppDatabase`) is the only writable store: the Borrow module mirrors INV type-09 receipts there and later workflow tables live there. Writes go only through `IAppDbConnectionFactory`/`BorrowMirrorRepository` (MySqlConnector); schema changes only via versioned `db/mysql/NNN_*.sql` applied with `scripts/mysql-migrate.ps1` (never at startup, never DROP). This does **not** relax anything above — INV stays SELECT-only and the MySQL factory refuses connection strings that name `INV`, use SQL Server keywords or `sa`. Never commit the MySQL connection string (use `appsettings.{Env}.local.json`, git-ignored).
+- **Application-owned MySQL `invc_web`** (Laragon MySQL, section `AppDatabase`) is the only writable store: the Borrow module mirrors INV type-09 receipts there and the append-only return trail `borrow_return_event` (migration 002) lives there. Writes go only through `IAppDbConnectionFactory`/`BorrowMirrorRepository`/`BorrowReturnRepository` (MySqlConnector); schema changes only via versioned `db/mysql/NNN_*.sql` applied with `scripts/mysql-migrate.ps1` (never at startup, never DROP). This does **not** relax anything above — INV stays SELECT-only and the MySQL factory refuses connection strings that name `INV`, use SQL Server keywords or `sa`. Never commit the MySQL connection string (use `appsettings.{Env}.local.json`, git-ignored).
 - Never connect as `sa` (the connection factory refuses it). Never commit credentials.
 - Unverifiable facts are marked **UNRESOLVED**, never guessed.
 - Work one phase at a time; end each phase with build/test results, git status and the safety report, then HARD STOP.
@@ -29,8 +29,8 @@ Invc.slnx
 src/Invc.Core            domain records, business rules (ported verbatim from legacy ASP), repository interfaces
                          Inventory/ (status, detail, InventoryRules) · Reorder/ (ReorderItem, ReorderReport) · PurchaseOrders/ (rules, report, detail) · Receipts/ (non-PO receipts: rules, report, detail) · Dashboard/ (DashboardService composes the other modules; DashboardRules only for legacy KPIs without an owner)
 src/Invc.Infrastructure  Dapper + Microsoft.Data.SqlClient; ReadOnlySqlConnectionFactory, ReadOnlySql guard, SQL text
-                         AppData/ (MySQL factory + options) · Borrow/ (BorrowSourceRepository = INV SELECT, BorrowMirrorRepository = MySQL DML)
-src/Invc.Web             Razor Pages (th-TH culture). Pages: Index (= operational Dashboard), Inventory/Status, Inventory/Detail/{code}, Reorder, Reorder/Print, PurchaseOrders, PurchaseOrders/Detail|Print/{realPo}, Receipts, Receipts/Detail|Print/{receiveNo}, Borrow, Borrow/Facility/{facilityCode}, Health
+                         AppData/ (MySQL factory + options + AppDatabaseHealth) · Borrow/ (BorrowSourceRepository + BorrowReceiptAdvisoryRepository = INV SELECT, BorrowMirrorRepository + BorrowReturnRepository = MySQL DML)
+src/Invc.Web             Razor Pages (th-TH culture). Pages: Index (= operational Dashboard), Inventory/Status, Inventory/Detail/{code}, Reorder, Reorder/Print, PurchaseOrders, PurchaseOrders/Detail|Print/{realPo}, Receipts, Receipts/Detail|Print/{receiveNo}, Borrow, Borrow/Facility/{facilityCode}, Borrow/Return/{item}, Borrow/ReturnBill/{bill}, Borrow/History, Borrow/Correct/{event}, Health
 tests/Invc.UnitTests     offline tests (rules, SQL guard, connection-string policy)
 tests/Invc.IntegrationTests  read-only parity tests against INV; auto-skip when unreachable
 docs/                    Phase 0 audit + business rules + parity matrix + setup
@@ -66,4 +66,4 @@ old-code/                (git-ignored) local archive of the legacy Classic ASP s
 ## Key docs
 `docs/data-source-map.md` (schema + evidence), `docs/inventory-business-rules.md`, `docs/purchase-order-business-rules.md`,
 `docs/report-parity-matrix.md`, `docs/phase2-inventory-parity.md` (A1–A10), `docs/phase3-reorder-parity.md` (B1–B6), `docs/phase4-purchase-order-parity.md` (C1–C9), `docs/phase5-receipts-data-map.md` + `docs/phase5-receipts-parity.md` (C10a–C10j), `docs/phase6-dashboard-parity.md` (D1–D10, C11), `docs/phase7-release-readiness.md`, `docs/iis-deployment-runbook.md`,
-`docs/phase0-security-and-data-access.md`, `docs/development-setup.md`, `docs/borrow-data-map.md` (Borrow: type-09 source, MySQL mirror, reconciliation).
+`docs/phase0-security-and-data-access.md`, `docs/development-setup.md`, `docs/borrow-data-map.md` (Borrow: type-09 source, MySQL mirror, reconciliation), `docs/borrow-workflow.md` (return events, statuses, corrections, advisory, production MySQL config).

@@ -1,0 +1,67 @@
+@page "{eventId:long}"
+@using Invc.Core.Borrow
+@model Invc.Web.Pages.Borrow.CorrectModel
+@{
+    ViewData["Title"] = "ย้อนกลับรายการคืน";
+    ViewData["HideNavSearch"] = true;
+    var e = Model.Event;
+}
+
+<div class="borrow-page ds-page borrow-form-page">
+    <nav class="borrow-breadcrumb" aria-label="breadcrumb">
+        <a asp-page="/Borrow/Index">ยายืม</a> <span aria-hidden="true">/</span>
+        <a asp-page="/Borrow/History">ประวัติการคืน</a> <span aria-hidden="true">/</span> <span>ย้อนกลับ</span>
+    </nav>
+
+    @if (Model.StoreUnavailable || e is null)
+    {
+        <h1 class="borrow-title">ย้อนกลับรายการคืน</h1>
+        <div class="ds-error" role="alert">@(Model.Error ?? Invc.Web.Borrow.BorrowScreenService.StoreError) — ดู <a asp-page="/Health">สถานะระบบ</a></div>
+    }
+    else
+    {
+        <div class="borrow-header">
+            <div>
+                <h1 class="borrow-title">ย้อนกลับรายการคืน<span class="borrow-title-code">#@e.Id</span></h1>
+                <p class="borrow-subtitle ds-identity">
+                    <span>@(string.IsNullOrWhiteSpace(e.DrugName) ? e.WorkingCode : e.DrugName)</span><span class="dot"></span><span>@e.WorkingCode</span>
+                    <span class="dot"></span><span>บิล @e.ReceiveNo</span><span class="dot"></span><span>@(e.FacilityName ?? e.FacilityCode ?? "–")</span>
+                </p>
+            </div>
+        </div>
+
+        <section class="ds-detail-summary borrow-figures" aria-label="รายการคืนเดิม">
+            <div class="ds-kpi"><span class="ds-kpi-label">คืนเมื่อ</span><span class="ds-kpi-value borrow-kpi-text">@e.EventAt.ToString("d MMM yyyy HH:mm")</span></div>
+            <div class="ds-kpi"><span class="ds-kpi-label">จำนวนที่คืน</span><span class="ds-kpi-value">@e.QuantityDelta.ToString("N0")</span></div>
+            <div class="ds-kpi"><span class="ds-kpi-label">ย้อนกลับได้อีก</span><span class="ds-kpi-value borrow-num--attention">@e.ReversibleQty.ToString("N0")</span></div>
+            <div class="ds-kpi"><span class="ds-kpi-label">ผู้บันทึกเดิม</span><span class="ds-kpi-value borrow-kpi-text">@e.Actor</span></div>
+        </section>
+        @if (!string.IsNullOrWhiteSpace(e.Note)) { <p class="ds-note">หมายเหตุเดิม: @e.Note</p> }
+
+        @if (Model.Error is not null) { <div class="ds-error" role="alert">@Model.Error</div> }
+
+        @if (e.EventType != BorrowReturnEventType.Return) { <div class="borrow-empty" role="status">แก้ไขได้เฉพาะรายการคืน</div> }
+        else if (e.ReversibleQty <= 0m) { <div class="borrow-empty" role="status">รายการคืนนี้ถูกย้อนกลับครบแล้ว</div> }
+        else
+        {
+            <form method="post" class="ds-detail-section borrow-form" asp-route-eventId="@Model.EventId">
+                <input type="hidden" asp-for="Form.ClientRequestId" />
+                <div class="borrow-form-grid">
+                    <div class="borrow-field">
+                        <label for="qty">จำนวนที่ย้อนกลับ <span class="ds-note">(ไม่เกิน @e.ReversibleQty.ToString("N0"))</span></label>
+                        <input class="ds-input ds-tabular" id="qty" asp-for="Form.Quantity" type="number" min="1" max="@e.ReversibleQty" step="1" inputmode="numeric" required />
+                    </div>
+                    <div class="borrow-field borrow-field--wide">
+                        <label for="note">เหตุผล <span class="ds-note">(บังคับ)</span></label>
+                        <input class="ds-input" id="note" asp-for="Form.Note" maxlength="@BorrowReturnRules.MaxNoteLength" required placeholder="เช่น บันทึกจำนวนผิด / คืนผิดรายการ" />
+                    </div>
+                </div>
+                <div class="borrow-form-actions">
+                    <button class="ds-btn ds-btn-primary" type="submit">บันทึกการย้อนกลับ</button>
+                    <a class="ds-btn ds-btn-secondary" asp-page="/Borrow/History" asp-route-receiveNo="@e.ReceiveNo">ยกเลิก</a>
+                </div>
+                <p class="ds-note">รายการคืนเดิมจะไม่ถูกลบหรือแก้ไข — ระบบเพิ่มรายการย้อนกลับใหม่พร้อมผู้บันทึกและเวลา</p>
+            </form>
+        }
+    }
+</div>

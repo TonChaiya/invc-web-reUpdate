@@ -1,80 +1,76 @@
 using Invc.Core.Borrow;
+using Invc.Core.Inventory;
+using Invc.Web.Borrow;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace Invc.Web.Pages.Borrow;
 
-/// <summary>Bills of one facility (newest first) with their items. Route: /Borrow/Facility/{facilityCode}. Reconciles first, like the index.</summary>
-public class FacilityModel(BorrowSyncService sync, IBorrowMirrorRepository mirror, ILogger<FacilityModel> logger) : PageModel
+/// <summary>
+/// Bills of one facility (newest first) with per-item borrowed / returned / outstanding, statuses, return actions and the
+/// read-only "มีการรับเข้าหลังยืม" hints. Route: /Borrow/Facility/{facilityCode}. Reconciles first, like the index.
+/// </summary>
+public class FacilityModel(BorrowScreenService screens) : PageModel
 {
-    /// <summary>Optional keyword: limits the shown bills/items to those matching drug name, working code, lot or receive/invoice no.</summary>
     [BindProperty(SupportsGet = true, Name = "q")]
     public string? Keyword { get; set; }
 
+    [BindProperty(SupportsGet = true, Name = "status")]
+    public string? StatusQuery { get; set; }
+
     public string FacilityCode { get; private set; } = string.Empty;
-    /// <summary>All bills of the facility (unfiltered) — the header totals are always the full picture.</summary>
-    public IReadOnlyList<BorrowSourceBill> AllBills { get; private set; } = [];
     public string? FacilityName { get; private set; }
-    public IReadOnlyList<BorrowSourceBill> Bills { get; private set; } = [];
+    public BorrowStatusFilter Filter { get; private set; } = BorrowStatusFilter.All;
+    /// <summary>All bills of the facility (unfiltered) — header totals are always the full picture.</summary>
+    public BorrowFacilityView Facility { get; private set; } = new(string.Empty, null, []);
+    public IReadOnlyList<BorrowBillView> Bills { get; private set; } = [];
     public BorrowSyncResult? Sync { get; private set; }
     public string? SyncError { get; private set; }
+    public string? AdvisoryWarning { get; private set; }
     public bool HasError { get; private set; }
+    public string? ErrorMessage { get; private set; }
+    [TempData] public string? Notice { get; set; }
+    [TempData] public string? Problem { get; set; }
 
-    public int ItemCount => AllBills.Sum(b => b.Items.Count);
-    public decimal TotalQty => AllBills.Sum(b => b.Items.Sum(i => i.QtyOrder ?? 0m));
     public int ShownItemCount => Bills.Sum(b => b.Items.Count);
+    public int CountFor(BorrowStatusFilter f) => Facility.Bills.Count(b => BorrowWorkboard.Matches(f, b.Status, b.HasConflict));
 
     public async Task<IActionResult> OnGetAsync(string? facilityCode, CancellationToken cancellationToken)
     {
         FacilityCode = facilityCode?.Trim() ?? string.Empty;
-        Keyword = Invc.Core.Inventory.SearchKeyword.Normalize(Keyword);
-        if (!BorrowRules.IsValidFacilityCode(FacilityCode))
-        {
-            return NotFound();
-        }
+        Keyword = SearchKeyword.Normalize(Keyword);
+        Filter = string.IsNullOrEmpty(StatusQuery) ? BorrowStatusFilter.All : BorrowStatusFilterExtensions.Parse(StatusQuery);
+        if (!BorrowRules.IsValidFacilityCode(FacilityCode)) return NotFound();
 
-        try
-        {
-            Sync = await sync.SyncAsync(cancellationToken);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            logger.LogError(ex, "Borrow reconciliation failed on facility page; showing the existing mirror");
-            SyncError = "ไม่สามารถซิงก์ข้อมูลจาก INV ได้ในขณะนี้ — แสดงข้อมูลที่ซิงก์ไว้ล่าสุด";
-        }
+        var s = await screens.TrySyncAsync(cancellationToken);
+        Sync = s.Result; SyncError = s.Warning;
+        var data = await screens.LoadFacilityAsync(FacilityCode, withHints: true, cancellationToken);
+        if (data.Error is not null) { HasError = true; ErrorMessage = data.Error; return Page(); }
+        AdvisoryWarning = data.AdvisoryWarning;
+        if (data.Bills.Count == 0) return NotFound();
 
-        try
-        {
-            AllBills = (await mirror.GetBillsAsync(FacilityCode, cancellationToken))
-                .Select(b => b with { Items = Invc.Core.Inventory.DrugNameOrder.Sort(b.Items, i => i.DrugName, i => i.WorkingCode) })
-                .ToList();   // owner rule: item lists A–Z by drug name
-            Bills = Filter(AllBills, Keyword);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            logger.LogError(ex, "Borrow mirror read failed (facility {FacilityCode})", FacilityCode);
-            HasError = true;
-            return Page();
-        }
-
-        if (AllBills.Count == 0)
-        {
-            return NotFound();
-        }
-        FacilityName = AllBills.Select(b => b.FacilityName).FirstOrDefault(n => !string.IsNullOrWhiteSpace(n));
+        var name = data.Bills.Select(b => b.Source.FacilityName).FirstOrDefault(n => !string.IsNullOrWhiteSpace(n));
+        Facility = new BorrowFacilityView(FacilityCode, name, data.Bills.OrderByDescending(b => b.Source.DateReceive).ThenByDescending(b => b.Source.SourceRecordNumber).ToList());
+        FacilityName = name;
+        Bills = Apply(Facility.Bills, Keyword, Filter);
         return Page();
     }
 
-    /// <summary>Bills whose receive/invoice no. matches keep all items; otherwise only the matching items are kept (bills with none drop out).</summary>
-    internal static IReadOnlyList<BorrowSourceBill> Filter(IReadOnlyList<BorrowSourceBill> bills, string? keyword)
+    /// <summary>
+    /// Status filter applies per item (a bill stays when at least one item matches); keyword: bills whose receive/invoice no.
+    /// matches keep all their (status-filtered) items, otherwise only items matching drug / code / lot are kept.
+    /// </summary>
+    internal static IReadOnlyList<BorrowBillView> Apply(IReadOnlyList<BorrowBillView> bills, string? keyword, BorrowStatusFilter status)
     {
-        if (keyword is null) return bills;
-        bool Has(string? s) => s is not null && s.Contains(keyword, StringComparison.OrdinalIgnoreCase);
-        var result = new List<BorrowSourceBill>();
+        bool Has(string? s) => keyword is not null && s is not null && s.Contains(keyword, StringComparison.OrdinalIgnoreCase);
+        var result = new List<BorrowBillView>();
         foreach (var b in bills)
         {
-            if (Has(b.ReceiveNo) || Has(b.InvoiceNo)) { result.Add(b); continue; }
-            var items = b.Items.Where(i => Has(i.DrugName) || Has(i.WorkingCode) || Has(i.LotNo)).ToList();
+            var items = b.Items.Where(i => BorrowWorkboard.Matches(status, i.Status, i.HasConflict)).ToList();
+            if (keyword is not null && !(Has(b.Source.ReceiveNo) || Has(b.Source.InvoiceNo)))
+            {
+                items = items.Where(i => Has(i.Source.DrugName) || Has(i.Source.WorkingCode) || Has(i.Source.LotNo)).ToList();
+            }
             if (items.Count > 0) result.Add(b with { Items = items });
         }
         return result;

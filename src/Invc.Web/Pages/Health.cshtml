@@ -1,4 +1,4 @@
-@page
+﻿@page
 @model HealthModel
 @{
     ViewData["Title"] = "สถานะระบบ";
@@ -27,6 +27,23 @@
         @if (v.Error is not null)
         {
             <tr><th scope="row">ข้อผิดพลาด</th><td class="text-danger">@v.Error</td></tr>
+        }
+        @{ var a = Model.AppDb; var appUp = a.State == Invc.Core.Diagnostics.AppDatabaseState.Up; }
+        <tr><th scope="row">ฐานข้อมูลของเว็บ (ยายืม)</th>
+            <td>
+                <span class="status-dot @(appUp ? "status-dot-ok" : "status-dot-bad")" aria-hidden="true"></span>
+                <span class="@(appUp ? "text-success" : "text-danger")">@a.StatusText</span>
+                @if (appUp) { <span class="text-muted"> · @a.Elapsed.TotalMilliseconds.ToString("N0") ms · โครงสร้างเวอร์ชัน @(a.SchemaVersion?.ToString() ?? "–")</span> }
+                @if (a.State == Invc.Core.Diagnostics.AppDatabaseState.NotConfigured) { <span class="text-muted"> · ยังไม่ได้ตั้งค่า AppDatabase__ConnectionString</span> }
+            </td></tr>
+        <tr><th scope="row">สำเนายายืมเปลี่ยนล่าสุด</th><td>@(a.LastMirrorSyncAt?.ToString("d MMM yyyy HH:mm") ?? "–")</td></tr>
+        @if (v.ShowTechnicalDetails && a.State != Invc.Core.Diagnostics.AppDatabaseState.Up && a.Error is not null)
+        {
+            <tr><th scope="row">ข้อผิดพลาด (เว็บ DB)</th><td class="text-danger">@a.Error</td></tr>
+        }
+        @if (v.ShowTechnicalDetails && appUp)
+        {
+            <tr><th scope="row">MySQL</th><td>@a.DatabaseName · @a.ServerVersion</td></tr>
         }
     </tbody>
 </table>

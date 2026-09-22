@@ -27,6 +27,9 @@ builder.Services.AddInvcReadOnlyData(builder.Configuration);
 // Application-owned MySQL database (invc_web) — the Borrow module's writable mirror. Schema comes from db/mysql via
 // scripts/mysql-migrate.ps1, never from startup. SQL Server INV stays SELECT-only.
 builder.Services.AddInvcAppData(builder.Configuration);
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<Invc.Web.Borrow.BorrowScreenService>();
 builder.Services.AddRazorPages();
 
 var app = builder.Build();
