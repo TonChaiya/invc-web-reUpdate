@@ -175,9 +175,11 @@ public sealed class DashboardPageUiTests : IClassFixture<DashboardPageUiTests.Fa
     {
         _factory.AnalyticsFail = false;
         var (_, html) = await GetAsync("/?fy=2569");
-        Assert.Single(Regex.Matches(html, "1,245,782\\.50"));                       // main-store value exactly once
+        // owner rule 2026-09-22: the main-store value = latest processed month-end (MNTH_SUM), never the live INV_MD snapshot
+        Assert.Single(Regex.Matches(html, "1,245,782\\.50"));                       // live snapshot appears once, as the secondary comparison row
         var stock = Text(Regex.Match(html, "<section class=\"dashboard-section dashboard-stock\".*?</section>", RegexOptions.Singleline).Value);
-        Assert.Contains("3 รายการใช้งาน 92,530 หน่วย มูลค่า 1,245,782.50 บาท", stock);
+        Assert.Contains("3 รายการใช้งาน 92,530 หน่วย มูลค่า 262,000.00 บาท (ประมวลผลจาก CARD · งวด ส.ค. 2569)", stock);
+        Assert.Contains("ยอดคงคลังปัจจุบันตามระบบ (INV_MD / INV_MD_C · ยังไม่ประมวลผล) 1,245,782.50 บาท · ต่างจากยอด CARD +983,782.50 บาท", stock);
         Assert.Contains("ED 173 (65%)", stock); Assert.Contains("NED 8 (3%)", stock); Assert.Contains("MES 86 (32%)", stock);
         Assert.Contains("composition-bar", html);
         Assert.Contains("อัตราสำรองคลัง 2.62 เดือน งวด ส.ค. 2569", stock);

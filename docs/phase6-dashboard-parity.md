@@ -1,4 +1,4 @@
-# Phase 6 — Dashboard + UX integration: parity and decisions
+﻿# Phase 6 — Dashboard + UX integration: parity and decisions
 
 Base commit `1b2e273` · parity executed **2026-09-16 14:55–15:00 (+07:00)** against live `DESKTOP-BVH8F8L.INV` (read-only).
 Tests: `DashboardParityTests` (integration, D1–D10 + C11 + cross-domain), `DashboardTests` / `DashboardSqlTests` (unit).
@@ -49,7 +49,7 @@ TOTAL_VALUE → `/Receipts?fy=`), as-of timestamp, section-level failure isolati
 - Known identity discrepancy: 2025-10 and 2025-11 differ by −150.00 (item 1000170: zero-valued return receipt O6800016 followed by a valued issue S6800013; the owner's manual correction of 2026-09-18 re-processed 2025-09 only). The report surfaces the difference unchanged; it is not corrected in the app (INV is read-only).
 
 ## Intentional deviations from legacy
-1. Main-store value = Phase 2 active definition (Dashboard.asp used all rows). 2. Lookups LEFT JOIN / safe (SUBSTOCK dept, TBLED_NED).
+1. Main-store value = **latest processed month-end** (Σ MNTH_SUM of the newest MBS_RE_M period; owner 2026-09-22 — replaces the Phase 2 live snapshot shown until then, which differed from the processed ledger by 5 645.64 on 2026-09-22 because of unrepaired CARD-vs-INV_MD valuation defects). Item count / units remain the Phase 2 active definition. 2. Lookups LEFT JOIN / safe (SUBSTOCK dept, TBLED_NED).
 3. No hard-coded item; D10 is user-selected. 4. Agreement rows with PACK_RATIO 0/NULL are counted but reported as "คำนวณมูลค่าไม่ได้"
 instead of crashing. 5. Movement shows receive/issue/other rollups **plus** raw category codes so nothing is hidden; CANCEL_FLAG rows are
 included exactly as the legacy query did. 6. No AJAX fragments, no auto-refresh, no chart library (CSS bars only).

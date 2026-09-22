@@ -54,7 +54,7 @@ else
 
     @* ---------- A. ภาพรวมคลัง — one inventory summary (value appears once) + supporting panels ---------- *@
     <section class="dashboard-section dashboard-stock" aria-labelledby="h-stock">
-        <h2 id="h-stock" class="dashboard-section-title">ภาพรวมคลัง <span class="dashboard-section-note">ข้อมูลปัจจุบัน ยกเว้นที่ระบุงวด</span></h2>
+        <h2 id="h-stock" class="dashboard-section-title">ภาพรวมคลัง <span class="dashboard-section-note">จำนวนรายการ/หน่วยเป็นข้อมูลปัจจุบัน · มูลค่าเป็นยอดงวดล่าสุดที่ประมวลผล</span></h2>
         <div class="dashboard-stock-grid">
             <div class="dashboard-panel dashboard-summary">
                 @if (s.Inventory is { IsAvailable: true, Value: { } inv })
@@ -63,8 +63,26 @@ else
                     <div class="ds-summary dashboard-summary-strip">
                         <span class="ds-stat"><strong>@inv.ActiveItemCount.ToString("N0")</strong> รายการใช้งาน</span>
                         <span class="ds-stat"><strong>@inv.TotalQtyOnHand.ToString("N0")</strong> หน่วย</span>
-                        <span class="ds-stat">มูลค่า <strong>@inv.TotalValue.ToString("N2")</strong> บาท</span>
+                        @* owner rule 2026-09-22: the main-store value shown here is the latest PROCESSED month-end (MNTH_SUM ending,
+                           the same figure as the last row of ความเคลื่อนไหวรายเดือน), never the live INV_MD snapshot. *@
+                        @if (s.Coverage is { IsAvailable: true, Value: { HasPeriod: true, MonthEndValue: { } processedValue } cov0 })
+                        {
+                            <span class="ds-stat">มูลค่า <strong>@processedValue.ToString("N2")</strong> บาท <span class="dashboard-muted">(ประมวลผลจาก CARD · งวด @cov0.DisplayPeriod)</span></span>
+                        }
+                        else
+                        {
+                            <span class="ds-stat">มูลค่า <strong class="dashboard-na">ยังไม่มีข้อมูล</strong> <span class="dashboard-muted">(รอประมวลผลรายเดือน)</span></span>
+                        }
                     </div>
+                    @* secondary row (owner 2026-09-22): the live INV_MD snapshot for comparison, with the gap to the processed value *@
+                    <p class="dashboard-panel-sub dashboard-live-value">
+                        ยอดคงคลังปัจจุบันตามระบบ (INV_MD / INV_MD_C · ยังไม่ประมวลผล) <strong class="ds-tabular">@inv.TotalValue.ToString("N2")</strong> บาท
+                        @if (s.Coverage is { IsAvailable: true, Value: { HasPeriod: true, MonthEndValue: { } processed } } && processed != inv.TotalValue)
+                        {
+                            var gap = inv.TotalValue - processed;
+                            <span class="dashboard-context-warn">· ต่างจากยอด CARD @(gap > 0 ? "+" : "−")@Math.Abs(gap).ToString("N2") บาท</span>
+                        }
+                    </p>
                 }
                 else { <partial name="_SectionUnavailable" model="@("คลังเวชภัณฑ์หลัก")" /> }
 

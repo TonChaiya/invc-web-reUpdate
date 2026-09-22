@@ -1,4 +1,4 @@
-/* ==========================================================================
+﻿/* ==========================================================================
    INVC Web — application visual system (Bootstrap 5 primitives + small set of reusable classes)
    Colour semantics: red = actionable/urgent, yellow = warning, green = healthy/complete, blue/neutral = information.
    Never rely on colour alone: every state also carries a text label.
@@ -453,6 +453,8 @@ a:focus-visible, button:focus-visible, .btn:focus-visible, .form-control:focus-v
 .dashboard-panel-value { font-size: 1.45rem; font-weight: 650; line-height: 1.2; color: var(--text-primary); font-variant-numeric: tabular-nums; }
 .dashboard-panel-value small { font-size: .8rem; font-weight: 400; color: var(--text-secondary); }
 .dashboard-panel-sub { font-size: .84rem; color: var(--text-secondary); }
+.dashboard-live-value { margin: 0 0 var(--sp-2); }
+.dashboard-live-value strong { color: var(--text-primary); font-weight: 600; }
 .dashboard-panel-note { font-size: .76rem; color: var(--text-tertiary); margin-top: 2px; }
 .dashboard-panel-link { margin-top: var(--sp-2); font-size: .84rem; color: var(--primary); text-decoration: none; }
 .dashboard-panel-link:hover { text-decoration: underline; }
