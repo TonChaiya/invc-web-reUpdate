@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using Invc.Infrastructure.AppData;
 using Invc.Infrastructure.Borrow;
 using Invc.Infrastructure.Data;
@@ -50,6 +50,19 @@ public class BorrowInfrastructureTests
     public void App_database_factory_refuses_sql_server_shapes_the_inv_database_and_sa(string connectionString)
     {
         Assert.Throws<InvalidOperationException>(() => MySqlAppDbConnectionFactory.Validate(connectionString));
+    }
+
+    [Fact]
+    public async Task App_database_factory_with_missing_configuration_constructs_but_fails_on_first_use()
+    {
+        // Production incident 2026-09-22: the factory is resolved while Razor activates the Borrow page model, so a throwing
+        // constructor bypassed the page's try/catch and sent /Borrow to the global /Error page. Construction must succeed;
+        // the configuration error surfaces on the first data operation, where Borrow renders its own error state.
+        var factory = new MySqlAppDbConnectionFactory(Microsoft.Extensions.Options.Options.Create(new AppDatabaseOptions()));
+        Assert.Equal(30, factory.CommandTimeoutSeconds);
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => factory.OpenAsync());
+        Assert.Contains("AppDatabase:ConnectionString' is missing", ex.Message);
+        Assert.Throws<InvalidOperationException>(() => factory.DatabaseName);
     }
 
     [Fact]

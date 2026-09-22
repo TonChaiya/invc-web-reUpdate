@@ -1,4 +1,4 @@
-using MySqlConnector;
+﻿using MySqlConnector;
 
 namespace Invc.Infrastructure.AppData;
 
@@ -28,27 +28,38 @@ public interface IAppDbConnectionFactory
 
 public sealed class MySqlAppDbConnectionFactory : IAppDbConnectionFactory
 {
-    private readonly string _connectionString;
+    private readonly AppDatabaseOptions _options;
+    private readonly Lazy<MySqlConnectionStringBuilder> _validated;
 
+    /// <summary>
+    /// Construction never throws: the factory is a singleton resolved while Razor activates the Borrow page model, i.e.
+    /// BEFORE the page's OnGet try/catch. Validation of the configured connection string is deferred to the first
+    /// <see cref="OpenAsync"/> (production incident 2026-09-22: a missing AppDatabase__ConnectionString escalated /Borrow
+    /// to the global /Error page instead of the module's own graceful error state). The same strict checks still run,
+    /// with the same messages, on every caught data operation — nothing is hidden, only moved to where it is handled.
+    /// </summary>
     public MySqlAppDbConnectionFactory(Microsoft.Extensions.Options.IOptions<AppDatabaseOptions> options)
     {
-        var opts = options.Value;
-        if (string.IsNullOrWhiteSpace(opts.ConnectionString))
+        _options = options.Value;
+        _validated = new Lazy<MySqlConnectionStringBuilder>(() =>
         {
-            throw new InvalidOperationException($"Configuration '{AppDatabaseOptions.SectionName}:ConnectionString' is missing (application MySQL database).");
-        }
-        var builder = Validate(opts.ConnectionString);
-        _connectionString = builder.ConnectionString;
-        DatabaseName = builder.Database;
-        CommandTimeoutSeconds = opts.CommandTimeoutSeconds <= 0 ? 30 : opts.CommandTimeoutSeconds;
+            if (string.IsNullOrWhiteSpace(_options.ConnectionString))
+            {
+                throw new InvalidOperationException($"Configuration '{AppDatabaseOptions.SectionName}:ConnectionString' is missing (application MySQL database).");
+            }
+            return Validate(_options.ConnectionString);
+        }, LazyThreadSafetyMode.PublicationOnly);
+        CommandTimeoutSeconds = _options.CommandTimeoutSeconds <= 0 ? 30 : _options.CommandTimeoutSeconds;
     }
 
     public int CommandTimeoutSeconds { get; }
-    public string DatabaseName { get; }
+
+    /// <summary>Database name from the validated connection string (throws the configuration error if it is invalid/missing).</summary>
+    public string DatabaseName => _validated.Value.Database;
 
     public async Task<MySqlConnection> OpenAsync(CancellationToken cancellationToken = default)
     {
-        var connection = new MySqlConnection(_connectionString);
+        var connection = new MySqlConnection(_validated.Value.ConnectionString);
         try
         {
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
