@@ -16,7 +16,7 @@ $files = Get-ChildItem -Recurse -File $PublishPath
 $dirs = Get-ChildItem -Recurse -Directory $PublishPath
 
 # 1. Forbidden file patterns (legacy evidence, source, symbols, developer config)
-$forbiddenPatterns = '*.asp','*.mdb','*.accdb','*.rar','*.zip','*.7z','*.cs','*.csproj','*.sln','*.slnx','*.pdb','appsettings.Development.json','*.mno','*.inc'
+$forbiddenPatterns = '*.asp','*.mdb','*.accdb','*.rar','*.zip','*.7z','*.cs','*.csproj','*.sln','*.slnx','*.pdb','appsettings.Development.json','appsettings.*.local.json','appsettings.Local.json','secrets.json','*.mno','*.inc'
 foreach ($p in $forbiddenPatterns) {
     $hits = $files | Where-Object { $_.Name -like $p }
     foreach ($h in $hits) { $failures.Add("forbidden artifact: $($h.FullName.Substring($PublishPath.Length))") }

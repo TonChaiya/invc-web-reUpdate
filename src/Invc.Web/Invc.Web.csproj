@@ -17,6 +17,8 @@
   <ItemGroup>
     <!-- Developer-only defaults (Windows-auth connection to the local instance) never enter a release package. -->
     <Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
+    <!-- Untracked developer overrides (appsettings.*.local.json, e.g. the local MySQL connection string) never enter a release package. -->
+    <Content Update="appsettings.*.local.json" CopyToPublishDirectory="Never" />
   </ItemGroup>
 
   <ItemGroup>
