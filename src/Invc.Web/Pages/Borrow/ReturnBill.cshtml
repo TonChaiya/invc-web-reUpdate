@@ -1,4 +1,4 @@
-@page "{billRecordNumber:int}"
+﻿@page "{billRecordNumber:int}"
 @using Invc.Core.Borrow
 @model Invc.Web.Pages.Borrow.ReturnBillModel
 @{
@@ -67,7 +67,7 @@
                 <div class="borrow-form-grid">
                     <div class="borrow-field">
                         <label for="at">วันที่-เวลาคืน</label>
-                        <input class="ds-input" id="at" asp-for="Form.EventAt" type="datetime-local" value="@((Model.Form.EventAt ?? Model.Now).ToString("yyyy-MM-dd'T'HH:mm"))" max="@Model.Now.AddMinutes(5).ToString("yyyy-MM-dd'T'HH:mm")" />
+                        <input class="ds-input" id="at" name="Form.EventAt" type="datetime-local" value="@Invc.Core.Diagnostics.HtmlDateValue.DateTimeLocal(Model.Form.EventAt ?? Model.Now)" max="@Invc.Core.Diagnostics.HtmlDateValue.DateTimeLocal(Model.Now.AddMinutes(5))" />
                     </div>
                     <div class="borrow-field borrow-field--wide">
                         <label for="note">หมายเหตุ <span class="ds-note">(ไม่บังคับ)</span></label>

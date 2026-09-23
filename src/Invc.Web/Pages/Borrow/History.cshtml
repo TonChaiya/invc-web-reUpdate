@@ -1,4 +1,4 @@
-@page
+﻿@page
 @using Invc.Core.Borrow
 @model Invc.Web.Pages.Borrow.HistoryModel
 @{
@@ -36,9 +36,9 @@
             <label class="visually-hidden" for="item">รายการยา</label>
             <input class="ds-input" id="item" name="item" value="@Model.Item" placeholder="รหัสยา / ชื่อยา" maxlength="@Invc.Core.Inventory.SearchKeyword.MaxLength" />
             <label class="visually-hidden" for="from">ตั้งแต่</label>
-            <input class="ds-input borrow-input-date" id="from" name="from" type="date" value="@Model.From?.ToString("yyyy-MM-dd")" />
+            <input class="ds-input borrow-input-date" id="from" name="from" type="date" value="@Invc.Core.Diagnostics.HtmlDateValue.Date(Model.From)" />
             <label class="visually-hidden" for="to">ถึง</label>
-            <input class="ds-input borrow-input-date" id="to" name="to" type="date" value="@Model.To?.ToString("yyyy-MM-dd")" />
+            <input class="ds-input borrow-input-date" id="to" name="to" type="date" value="@Invc.Core.Diagnostics.HtmlDateValue.Date(Model.To)" />
             <label class="visually-hidden" for="actor">ผู้บันทึก</label>
             <input class="ds-input borrow-input-short" id="actor" name="actor" value="@Model.Actor" placeholder="ผู้บันทึก" maxlength="@Invc.Core.Inventory.SearchKeyword.MaxLength" />
             <button class="ds-btn ds-btn-primary" type="submit">กรอง</button>

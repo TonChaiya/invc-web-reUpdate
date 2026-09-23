@@ -98,6 +98,34 @@ public sealed class BorrowWorkflowPageTests : IDisposable
     }
 
     [Fact]
+    public async Task Return_forms_default_the_date_to_now_in_a_value_browsers_accept()
+    {
+        // production defect 2026-09-23: the app runs under th-TH (Buddhist calendar), so a culture-formatted value
+        // rendered "2569-09-23T09:54" and the browser showed an empty date. HTML date controls are Gregorian-only.
+        await PrimeAsync();
+        foreach (var url in new[] { "/Borrow/Return/1036", "/Borrow/ReturnBill/100" })
+        {
+            var html = WebUtility.HtmlDecode(await _client.GetStringAsync(url));
+            var input = Regex.Match(html, "<input[^>]*id=\"at\"[^>]*>").Value;
+            Assert.Contains("type=\"datetime-local\"", input);
+            var value = Regex.Match(input, "value=\"([^\"]+)\"").Groups[1].Value;
+            var max = Regex.Match(input, "max=\"([^\"]+)\"").Groups[1].Value;
+            foreach (var v in new[] { value, max })
+            {
+                Assert.Matches(@"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$", v);
+                Assert.True(DateTime.TryParseExact(v, "yyyy-MM-dd'T'HH:mm", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var parsed), v);
+                Assert.Equal(DateTime.Now.Year, parsed.Year);            // Gregorian year, not 2569
+                Assert.Equal(DateTime.Now.Date, parsed.Date);            // defaults to today
+            }
+            Assert.Contains("name=\"Form.EventAt\"", input);            // still binds to the model
+        }
+        // history date filters use the same Gregorian formatting
+        var history = WebUtility.HtmlDecode(await _client.GetStringAsync("/Borrow/History?from=2026-09-01&to=2026-09-30"));
+        Assert.Contains("value=\"2026-09-01\"", history);
+        Assert.Contains("value=\"2026-09-30\"", history);
+    }
+
+    [Fact]
     public async Task Over_return_and_invalid_quantities_are_rejected_server_side_without_writing()
     {
         await PrimeAsync();
