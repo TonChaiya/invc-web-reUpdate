@@ -97,6 +97,108 @@ public sealed class BorrowWorkflowPageTests : IDisposable
         Assert.Contains("รายการนี้คืนครบแล้ว", closed);
     }
 
+    private async Task<(string Token, string ClientRequestId, string Action)> InlineFormAsync(int itemRecordNumber, string url = "/Borrow/Facility/CUB001?status=all")
+    {
+        var html = await _client.GetStringAsync(url);
+        var row = Regex.Match(html, "<div class=\"borrow-item-row[^\"]*\" id=\"item-" + itemRecordNumber + "\">.*?</form>", RegexOptions.Singleline).Value;
+        var form = Regex.Match(row, "<form[^>]*class=\"borrow-quick-return\".*?</form>", RegexOptions.Singleline).Value;
+        Assert.Contains("method=\"post\"", form);
+        return (Regex.Match(form, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"").Groups[1].Value,
+                Regex.Match(form, "name=\"Quick.ClientRequestId\" value=\"([^\"]+)\"").Groups[1].Value,
+                WebUtility.HtmlDecode(Regex.Match(form, "action=\"([^\"]+)\"").Groups[1].Value));   // browsers decode &amp; in the action
+    }
+
+    [Fact]
+    public async Task Inline_return_updates_the_page_in_place_without_navigating()
+    {
+        await PrimeAsync();
+        var (token, cid, action) = await InlineFormAsync(1036);
+        Assert.Contains("handler=Return", action);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, action)
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["Quick.ItemRecordNumber"] = "1036", ["Quick.BillRecordNumber"] = "113", ["Quick.Quantity"] = "50",
+                ["Quick.ClientRequestId"] = cid, ["__RequestVerificationToken"] = token,
+            }),
+        };
+        request.Headers.Add("X-Requested-With", "fetch");
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);                       // a fragment, not a redirect
+        var fragment = WebUtility.HtmlDecode(await response.Content.ReadAsStringAsync());
+        Assert.DoesNotContain("<html", fragment);                                    // partial only: the shell is not re-sent
+        Assert.Contains("บันทึกคืน 50 เรียบร้อย", fragment);
+        Assert.Contains("id=\"item-1036\"", fragment);
+        Assert.Contains("is-updated", fragment);                                     // the row is highlighted after the swap
+
+        var ev = Assert.Single(_factory.Returns.Events);
+        Assert.Equal(50m, ev.QuantityDelta); Assert.Equal(BorrowReturnEventType.Return, ev.EventType);
+        Assert.StartsWith("anonymous:", ev.Actor);                                   // server-side actor, never the form
+        Assert.Null(ev.Note);
+
+        var row = Text(Regex.Match(fragment, "id=\"item-1036\">(.*?)</dl>", RegexOptions.Singleline).Groups[1].Value);
+        Assert.Contains("ยืม 250", row); Assert.Contains("คืนแล้ว 50", row); Assert.Contains("คงเหลือ 200", row);
+        Assert.Contains("คืนบางส่วน", fragment);
+        // facility and bill totals in the same fragment are recomputed
+        var summary = Text(Regex.Match(fragment, "<div class=\"borrow-summary\".*?</div>", RegexOptions.Singleline).Value);
+        Assert.Contains("คืนแล้ว 50", summary); Assert.Contains("คงค้าง 700", summary);   // CUB001: 750 borrowed − 50 returned
+
+        // the same client request id (double click / retry) does not write twice
+        var again = new HttpRequestMessage(HttpMethod.Post, action)
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["Quick.ItemRecordNumber"] = "1036", ["Quick.BillRecordNumber"] = "113", ["Quick.Quantity"] = "50",
+                ["Quick.ClientRequestId"] = cid, ["__RequestVerificationToken"] = token,
+            }),
+        };
+        again.Headers.Add("X-Requested-With", "fetch");
+        var second = await _client.SendAsync(again);
+        Assert.Contains("ไม่บันทึกซ้ำ", WebUtility.HtmlDecode(await second.Content.ReadAsStringAsync()));
+        Assert.Single(_factory.Returns.Events);
+    }
+
+    [Fact]
+    public async Task Inline_return_validates_server_side_and_falls_back_to_redirect_without_javascript()
+    {
+        await PrimeAsync();
+        var (token, cid, action) = await InlineFormAsync(900);
+
+        // over-return through the inline form is refused and reported inside the fragment
+        var bad = new HttpRequestMessage(HttpMethod.Post, action)
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["Quick.ItemRecordNumber"] = "900", ["Quick.BillRecordNumber"] = "100", ["Quick.Quantity"] = "101",
+                ["Quick.ClientRequestId"] = cid, ["__RequestVerificationToken"] = token,
+            }),
+        };
+        bad.Headers.Add("X-Requested-With", "fetch");
+        var badResponse = await _client.SendAsync(bad);
+        Assert.Equal(HttpStatusCode.OK, badResponse.StatusCode);
+        Assert.Contains("คืนได้ไม่เกินยอดคงเหลือ 100", WebUtility.HtmlDecode(await badResponse.Content.ReadAsStringAsync()));
+        Assert.Empty(_factory.Returns.Events);
+
+        // an item that does not belong to the posted bill is refused
+        var mismatch = await PostAsync(action, token, new() { ["Quick.ItemRecordNumber"] = "900", ["Quick.BillRecordNumber"] = "113", ["Quick.Quantity"] = "1", ["Quick.ClientRequestId"] = Guid.NewGuid().ToString("D") });
+        Assert.Equal(HttpStatusCode.Redirect, mismatch.StatusCode);                  // no AJAX header → PRG fallback
+        Assert.Empty(_factory.Returns.Events);
+
+        // plain (no-JavaScript) submit succeeds and redirects back to the same filtered view
+        var (token2, cid2, action2) = await InlineFormAsync(900);
+        var plain = await PostAsync(action2, token2, new() { ["Quick.ItemRecordNumber"] = "900", ["Quick.BillRecordNumber"] = "100", ["Quick.Quantity"] = "40", ["Quick.ClientRequestId"] = cid2 });
+        Assert.Equal(HttpStatusCode.Redirect, plain.StatusCode);
+        Assert.StartsWith("/Borrow/Facility/CUB001?status=all", plain.Headers.Location!.ToString());
+        Assert.Contains("#item-900", plain.Headers.Location!.ToString());
+        Assert.Equal(40m, Assert.Single(_factory.Returns.Events).QuantityDelta);
+
+        // and without an antiforgery token nothing is written
+        var forged = await _client.PostAsync(action2, new FormUrlEncodedContent(new Dictionary<string, string> { ["Quick.ItemRecordNumber"] = "900", ["Quick.BillRecordNumber"] = "100", ["Quick.Quantity"] = "1", ["Quick.ClientRequestId"] = Guid.NewGuid().ToString("D") }));
+        Assert.Equal(HttpStatusCode.BadRequest, forged.StatusCode);
+        Assert.Single(_factory.Returns.Events);
+    }
+
     [Fact]
     public async Task Return_forms_default_the_date_to_now_in_a_value_browsers_accept()
     {

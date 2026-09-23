@@ -1,11 +1,8 @@
-﻿@page "{facilityCode}"
-@using Invc.Core.Borrow
+@page "{facilityCode}"
 @model Invc.Web.Pages.Borrow.FacilityModel
 @{
     ViewData["Title"] = $"{Model.FacilityName ?? Model.FacilityCode} ({Model.FacilityCode})";
     ViewData["HideNavSearch"] = true;
-    var filters = new[] { BorrowStatusFilter.Outstanding, BorrowStatusFilter.Partial, BorrowStatusFilter.Returned, BorrowStatusFilter.All };
-    string D(DateTime? d) => d?.ToString("d MMM yyyy") ?? "–";
 }
 
 <div class="borrow-page borrow-facility-page ds-page">
@@ -25,126 +22,12 @@
     @if (Model.Notice is not null) { <div class="ds-notice" role="status">@Model.Notice</div> }
     @if (Model.Problem is not null) { <div class="ds-error" role="alert">@Model.Problem</div> }
 
-    @if (Model.HasError)
-    {
-        <div class="ds-error" role="alert">@Model.ErrorMessage — ดู <a asp-page="/Health">สถานะระบบ</a></div>
-    }
-    else
-    {
-        <div class="borrow-summary" role="group" aria-label="สรุป">
-            <span class="borrow-stat">บิล <strong>@Model.Facility.BillCount.ToString("N0")</strong> <small>(ค้าง @Model.Facility.OpenBillCount.ToString("N0"))</small></span>
-            <span class="borrow-stat">รายการ <strong>@Model.Facility.ItemCount.ToString("N0")</strong></span>
-            <span class="borrow-stat">ยืม <strong>@Model.Facility.BorrowedQty.ToString("N0")</strong></span>
-            <span class="borrow-stat">คืนแล้ว <strong>@Model.Facility.ReturnedQty.ToString("N0")</strong></span>
-            <span class="borrow-stat borrow-stat--attention">คงค้าง <strong>@Model.Facility.OutstandingQty.ToString("N0")</strong></span>
-        </div>
-        @if (Model.Facility.HasConflict)
-        {
-            <div class="ds-warning" role="status">มีรายการที่ยอดคืนแล้วมากกว่ายอดยืมในต้นทาง (INV ถูกแก้ไขหลังบันทึกคืน) — ระบบไม่แก้ไขประวัติอัตโนมัติ กรุณาตรวจสอบรายการที่ติดป้าย “ต้องตรวจสอบ”</div>
-        }
-        @if (Model.AdvisoryWarning is not null) { <p class="ds-note">@Model.AdvisoryWarning</p> }
-
-        <div class="borrow-controls">
-        <nav class="borrow-tabs" aria-label="เลือกสถานะ">
-            @foreach (var f in filters)
-            {
-                var active = Model.Filter == f;
-                <a class="borrow-tab @(active ? "is-active" : "") is-@f.ToQueryValue()" asp-page="/Borrow/Facility" asp-route-facilityCode="@Model.FacilityCode" asp-route-status="@f.ToQueryValue()" asp-route-q="@Model.Keyword" aria-current="@(active ? "page" : null)">
-                    <span>@f.ThaiLabel()</span><span class="borrow-tab-count">@Model.CountFor(f).ToString("N0")</span>
-                </a>
-            }
-        </nav>
-
-        <form method="get" class="borrow-toolbar" role="search" aria-label="ค้นหาในสถานบริการนี้">
-            <input type="hidden" name="status" value="@Model.Filter.ToQueryValue()" />
-            <label class="visually-hidden" for="q">ค้นหา</label>
-            <input class="ds-input" type="search" id="q" name="q" value="@Model.Keyword"
-                   maxlength="@Invc.Core.Inventory.SearchKeyword.MaxLength" autocomplete="off"
-                   placeholder="ค้นหายา รหัสยา Lot เลขบิล หรือเลขเอกสาร" />
-            <button class="ds-btn ds-btn-primary" type="submit">ค้นหา</button>
-            @if (Model.Keyword is not null) { <a class="ds-btn ds-btn-secondary" asp-page="/Borrow/Facility" asp-route-facilityCode="@Model.FacilityCode" asp-route-status="@Model.Filter.ToQueryValue()">ล้าง</a> }
-        </form>
-        </div>
-        <p class="borrow-result-meta"><strong>@Model.Filter.ThaiLabel()</strong> · @Model.ShownItemCount.ToString("N0") รายการ ใน @Model.Bills.Count.ToString("N0") บิล @if (Model.Keyword is not null) { <text>· ค้นหา “@Model.Keyword”</text> }</p>
-
-        @if (Model.Bills.Count == 0)
-        {
-            <div class="borrow-empty" role="status">@(Model.Keyword is null ? $"ไม่มีรายการในสถานะ “{Model.Filter.ThaiLabel()}”" : $"ไม่พบรายการที่ตรงกับ “{Model.Keyword}”")</div>
-        }
-        else
-        {
-        <div class="borrow-bill-list">
-        @foreach (var bill in Model.Bills)
-        {
-            var b = bill.Source;
-            <section class="borrow-bill@(bill.HasConflict ? " has-conflict" : "")" aria-label="บิล @b.ReceiveNo" id="bill-@b.SourceRecordNumber">
-                <header class="borrow-bill-header">
-                    <span class="borrow-bill-no">@b.ReceiveNo
-                        @if (bill.HasConflict) { <span class="status-chip status-review">ต้องตรวจสอบ</span> } else { <span class="status-chip @bill.Status.ChipClass()">@bill.Status.ThaiLabel()</span> }
-                    </span>
-                    <span class="borrow-bill-meta">
-                        @if (!string.IsNullOrWhiteSpace(b.InvoiceNo)) { <span>เอกสาร @b.InvoiceNo</span><span class="dot"></span> }
-                        <span>@bill.ItemCount.ToString("N0") รายการ</span><span class="dot"></span>
-                        <span>ยืม <strong class="ds-tabular">@bill.BorrowedQty.ToString("N0")</strong></span><span class="dot"></span>
-                        <span>คืนแล้ว <strong class="ds-tabular">@bill.ReturnedQty.ToString("N0")</strong></span><span class="dot"></span>
-                        <span>คงค้าง <strong class="ds-tabular @(bill.OutstandingQty > 0m ? "borrow-num--attention" : "")">@bill.OutstandingQty.ToString("N0")</strong></span>
-                        @if (bill.CanReturnAll)
-                        {
-                            <span class="dot"></span><a class="borrow-inline-action" asp-page="/Borrow/ReturnBill" asp-route-billRecordNumber="@b.SourceRecordNumber">คืนครบทั้งบิล…</a>
-                        }
-                        <span class="dot"></span><a class="borrow-inline-action" asp-page="/Borrow/History" asp-route-receiveNo="@b.ReceiveNo">ประวัติ</a>
-                    </span>
-                    <span class="borrow-bill-date">รับ @D(b.DateReceive)</span>
-                </header>
-                <div class="borrow-item-head" aria-hidden="true">
-                    <span>รายการยา</span><span>ยืม</span><span>คืนแล้ว</span><span>คงเหลือ</span><span>สถานะ / การทำงาน</span>
-                </div>
-                <div class="borrow-item-list">
-                @foreach (var item in bill.Items)
-                {
-                    var i = item.Source;
-                    <div class="borrow-item-row@(item.HasConflict ? " has-conflict" : "")" id="item-@i.SourceRecordNumber">
-                        <div class="borrow-item-main">
-                            <a class="borrow-item-name" asp-page="/Inventory/Detail" asp-route-workingCode="@i.WorkingCode">@item.DisplayName</a>
-                            <div class="borrow-item-meta">
-                                <span>@i.WorkingCode</span>
-                                @if (i.PackRatio is { } pr) { <span class="dot"></span><span>Pack @pr.ToString("N0")</span> }
-                                @if (!string.IsNullOrWhiteSpace(i.LotNo)) { <span class="dot"></span><span>Lot @i.LotNo</span> }
-                                @if (item.LastReturnAt is { } lr) { <span class="dot"></span><span>คืนล่าสุด @lr.ToString("d MMM yyyy HH:mm")</span> }
-                            </div>
-                            @if (item.ReceiptHints.Count > 0)
-                            {
-                                var h0 = item.ReceiptHints[0];
-                                <details class="borrow-hint">
-                                    <summary><span class="status-chip status-chip-neutral">มีการรับเข้าหลังยืม</span> <span class="borrow-hint-summary">@item.ReceiptHints.Count.ToString("N0") ใบรับ · ล่าสุด @D(h0.DateReceive) (@(h0.TypeName ?? h0.TypeCode))</span></summary>
-                                    <p class="ds-note">ข้อมูลประกอบการพิจารณาเท่านั้น — ระบบไม่ถือว่าเป็นการคืนอัตโนมัติ</p>
-                                    <ul class="borrow-hint-list">
-                                        @foreach (var h in item.ReceiptHints.Take(8))
-                                        {
-                                            <li><a asp-page="/Receipts/Detail" asp-route-receiveNo="@h.ReceiveNo">@h.ReceiveNo</a> · @(h.TypeName ?? h.TypeCode) (@h.TypeCode) · รับ @D(h.DateReceive) · จำนวน <span class="ds-tabular">@((h.Qty ?? 0m).ToString("N0"))</span>@if (!string.IsNullOrWhiteSpace(h.LotNo)) { <text> · Lot @h.LotNo</text> }</li>
-                                        }
-                                        @if (item.ReceiptHints.Count > 8) { <li class="ds-note">และอีก @((item.ReceiptHints.Count - 8).ToString("N0")) ใบรับ</li> }
-                                    </ul>
-                                </details>
-                            }
-                        </div>
-                        <dl class="borrow-item-figures">
-                            <div class="borrow-fig"><dt>ยืม</dt><dd>@item.BorrowedQty.ToString("N0")</dd></div>
-                            <div class="borrow-fig"><dt>คืนแล้ว</dt><dd>@item.ReturnedQty.ToString("N0")</dd></div>
-                            <div class="borrow-fig @(item.OutstandingQty > 0m ? "is-attention" : "is-done")"><dt>คงเหลือ</dt><dd>@item.OutstandingQty.ToString("N0")</dd></div>
-                        </dl>
-                        <div class="borrow-item-actions">
-                            @if (item.HasConflict) { <span class="status-chip status-review" title="คืนแล้ว @item.ReturnedQty.ToString("N0") มากกว่ายอดยืม @item.BorrowedQty.ToString("N0")">ต้องตรวจสอบ</span> }
-                            else { <span class="status-chip @item.Status.ChipClass()">@item.Status.ThaiLabel()</span> }
-                            @if (item.CanReturn) { <a class="ds-btn ds-btn-primary ds-btn-sm" asp-page="/Borrow/Return" asp-route-itemRecordNumber="@i.SourceRecordNumber">บันทึกคืน</a> }
-                            @if (item.EventCount > 0) { <a class="borrow-inline-action" asp-page="/Borrow/History" asp-route-receiveNo="@b.ReceiveNo" asp-route-item="@i.WorkingCode">ประวัติ</a> }
-                        </div>
-                    </div>
-                }
-                </div>
-            </section>
-        }
-        </div>
-        }
-    }
+    @* The Return handler re-renders exactly this region after an inline return, so every figure stays server-computed. *@
+    <div id="borrow-body" data-borrow-body>
+        <partial name="_FacilityBody" model="Model" />
+    </div>
 </div>
+
+@section Scripts {
+    <script src="~/js/borrow-return.js" asp-append-version="true"></script>
+}

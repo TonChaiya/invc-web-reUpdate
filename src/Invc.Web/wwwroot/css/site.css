@@ -732,7 +732,7 @@ a:focus-visible, button:focus-visible, .btn:focus-visible, .form-control:focus-v
 .borrow-inline-action:hover { text-decoration: underline; }
 
 /* item table: one grid shared by the column header and every row */
-.borrow-item-head, .borrow-item-row { display: grid; grid-template-columns: minmax(0, 1fr) 5.5rem 5.5rem 6rem 12.5rem; column-gap: var(--sp-3); align-items: center; padding: 9px var(--sp-4); }
+.borrow-item-head, .borrow-item-row { display: grid; grid-template-columns: minmax(0, 1fr) 5rem 5rem 5.5rem 16rem; column-gap: var(--sp-3); align-items: center; padding: 9px var(--sp-4); }
 .borrow-item-head { font-size: .8rem; font-weight: 500; letter-spacing: .02em; color: var(--text-secondary); background: var(--surface-subtle); border-bottom: 1px solid var(--border); padding-top: 4px; padding-bottom: 4px; }
 .borrow-item-head span:not(:first-child) { text-align: right; }
 .borrow-item-head span:last-child { text-align: right; }
@@ -748,9 +748,18 @@ a:focus-visible, button:focus-visible, .btn:focus-visible, .form-control:focus-v
 .borrow-item-figures dd { margin: 0; font-size: 1.02rem; font-weight: 600; color: var(--text-primary); }
 .borrow-fig.is-attention dd { color: var(--danger); font-weight: 700; }
 .borrow-fig.is-done dd { color: var(--success); }
-.borrow-item-actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-2); min-width: 0; }
+.borrow-item-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 4px var(--sp-2); min-width: 0; }
 .borrow-item-actions .status-chip { font-size: .8rem; padding: 2px 9px; }
 .borrow-item-actions .ds-btn-sm { height: 32px; line-height: 30px; padding: 0 12px; font-size: .85rem; }
+/* inline return (no navigation): compact qty + button inside the action column */
+.borrow-quick-return { display: inline-flex; align-items: center; gap: 4px; }
+.borrow-quick-qty { width: 4.6rem; height: 32px; padding: 0 6px; text-align: right; font-size: .88rem; }
+.borrow-quick-return.is-busy { opacity: .65; }
+.borrow-item-detail-link { font-size: .78rem; color: var(--text-secondary); }
+.borrow-item-detail-link:hover { color: var(--primary); }
+.borrow-live-notice { margin-bottom: var(--sp-2); }
+.borrow-item-row.is-updated { background: var(--success-soft); box-shadow: inset 3px 0 0 var(--success); }
+@media (prefers-reduced-motion: no-preference) { .borrow-item-row.is-updated { transition: background 600ms ease; } }
 .borrow-hint { grid-column: 1 / -1; margin-top: 3px; font-size: .82rem; }
 .borrow-hint summary { cursor: pointer; color: var(--text-secondary); }
 .borrow-hint summary .status-chip { font-size: .8rem; padding: 0 8px; font-weight: 500; }
@@ -783,7 +792,7 @@ a:focus-visible, button:focus-visible, .btn:focus-visible, .form-control:focus-v
 .borrow-item-history { margin-top: var(--sp-4); }
 
 @media (max-width: 1199.98px) {
-  .borrow-item-head, .borrow-item-row { grid-template-columns: minmax(0, 1fr) 4.5rem 4.5rem 4.5rem 11rem; }
+  .borrow-item-head, .borrow-item-row { grid-template-columns: minmax(0, 1fr) 4.5rem 4.5rem 5rem 14rem; }
 }
 @media (max-width: 991.98px) {
   .borrow-facility-head, .borrow-facility-row { grid-template-columns: minmax(0, 1fr) 5rem 6.5rem 1.5rem; }
