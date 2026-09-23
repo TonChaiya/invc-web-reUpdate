@@ -8,19 +8,17 @@
     string D(DateTime? d) => d?.ToString("d MMM yyyy") ?? "–";
 }
 
-<div class="borrow-page ds-page">
+<div class="borrow-page borrow-facility-page ds-page">
     <nav class="borrow-breadcrumb" aria-label="breadcrumb">
         <a asp-page="/Borrow/Index">ยายืม</a> <span aria-hidden="true">/</span> <span>@(Model.FacilityName ?? Model.FacilityCode)</span>
     </nav>
 
-    <div class="borrow-header">
-        <div>
-            <h1 class="borrow-title">@(Model.FacilityName ?? Model.FacilityCode)<span class="borrow-title-code borrow-facility-code">@Model.FacilityCode</span></h1>
-        </div>
+    <div class="borrow-header borrow-header--compact">
+        <h1 class="borrow-title">@(Model.FacilityName ?? Model.FacilityCode)<span class="borrow-title-code borrow-facility-code">@Model.FacilityCode</span></h1>
         <div class="borrow-sync" aria-live="polite">
             @if (Model.Sync is { } s) { <span>ซิงก์ INV <time datetime="@s.SyncedAt.ToString("s")">@s.SyncedAt.ToString("d MMM yyyy HH:mm")</time></span> }
             @if (Model.SyncError is not null) { <span class="borrow-sync-warning" role="status">@Model.SyncError</span> }
-            <a class="borrow-history-link" asp-page="/Borrow/History" asp-route-facility="@Model.FacilityCode">ประวัติการคืนของสถานบริการนี้</a>
+            <a class="borrow-history-link" asp-page="/Borrow/History" asp-route-facility="@Model.FacilityCode">ประวัติการคืน</a>
         </div>
     </div>
 
@@ -46,6 +44,7 @@
         }
         @if (Model.AdvisoryWarning is not null) { <p class="ds-note">@Model.AdvisoryWarning</p> }
 
+        <div class="borrow-controls">
         <nav class="borrow-tabs" aria-label="เลือกสถานะ">
             @foreach (var f in filters)
             {
@@ -65,6 +64,7 @@
             <button class="ds-btn ds-btn-primary" type="submit">ค้นหา</button>
             @if (Model.Keyword is not null) { <a class="ds-btn ds-btn-secondary" asp-page="/Borrow/Facility" asp-route-facilityCode="@Model.FacilityCode" asp-route-status="@Model.Filter.ToQueryValue()">ล้าง</a> }
         </form>
+        </div>
         <p class="borrow-result-meta"><strong>@Model.Filter.ThaiLabel()</strong> · @Model.ShownItemCount.ToString("N0") รายการ ใน @Model.Bills.Count.ToString("N0") บิล @if (Model.Keyword is not null) { <text>· ค้นหา “@Model.Keyword”</text> }</p>
 
         @if (Model.Bills.Count == 0)
@@ -82,7 +82,6 @@
                     <span class="borrow-bill-no">@b.ReceiveNo
                         @if (bill.HasConflict) { <span class="status-chip status-review">ต้องตรวจสอบ</span> } else { <span class="status-chip @bill.Status.ChipClass()">@bill.Status.ThaiLabel()</span> }
                     </span>
-                    <span class="borrow-bill-date">รับ @D(b.DateReceive)</span>
                     <span class="borrow-bill-meta">
                         @if (!string.IsNullOrWhiteSpace(b.InvoiceNo)) { <span>เอกสาร @b.InvoiceNo</span><span class="dot"></span> }
                         <span>@bill.ItemCount.ToString("N0") รายการ</span><span class="dot"></span>
@@ -95,7 +94,11 @@
                         }
                         <span class="dot"></span><a class="borrow-inline-action" asp-page="/Borrow/History" asp-route-receiveNo="@b.ReceiveNo">ประวัติ</a>
                     </span>
+                    <span class="borrow-bill-date">รับ @D(b.DateReceive)</span>
                 </header>
+                <div class="borrow-item-head" aria-hidden="true">
+                    <span>รายการยา</span><span>ยืม</span><span>คืนแล้ว</span><span>คงเหลือ</span><span>สถานะ / การทำงาน</span>
+                </div>
                 <div class="borrow-item-list">
                 @foreach (var item in bill.Items)
                 {
@@ -126,9 +129,9 @@
                             }
                         </div>
                         <dl class="borrow-item-figures">
-                            <div><dt>ยืม</dt><dd>@item.BorrowedQty.ToString("N0")</dd></div>
-                            <div><dt>คืนแล้ว</dt><dd>@item.ReturnedQty.ToString("N0")</dd></div>
-                            <div class="@(item.OutstandingQty > 0m ? "is-attention" : "is-done")"><dt>คงเหลือ</dt><dd>@item.OutstandingQty.ToString("N0")</dd></div>
+                            <div class="borrow-fig"><dt>ยืม</dt><dd>@item.BorrowedQty.ToString("N0")</dd></div>
+                            <div class="borrow-fig"><dt>คืนแล้ว</dt><dd>@item.ReturnedQty.ToString("N0")</dd></div>
+                            <div class="borrow-fig @(item.OutstandingQty > 0m ? "is-attention" : "is-done")"><dt>คงเหลือ</dt><dd>@item.OutstandingQty.ToString("N0")</dd></div>
                         </dl>
                         <div class="borrow-item-actions">
                             @if (item.HasConflict) { <span class="status-chip status-review" title="คืนแล้ว @item.ReturnedQty.ToString("N0") มากกว่ายอดยืม @item.BorrowedQty.ToString("N0")">ต้องตรวจสอบ</span> }
