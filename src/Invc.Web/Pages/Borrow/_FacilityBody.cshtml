@@ -12,6 +12,9 @@
     string D(DateTime? d) => d?.ToString("d MMM yyyy") ?? "–";
 }
 
+@* token for the JavaScript-driven bill return (the item forms carry their own) *@
+<form id="borrow-antiforgery" method="post" hidden>@Html.AntiForgeryToken()</form>
+
 @if (Model.InlineNotice is not null) { <div class="ds-notice borrow-live-notice" role="status">@Model.InlineNotice</div> }
 @if (Model.InlineError is not null) { <div class="ds-error borrow-live-notice" role="alert">@Model.InlineError</div> }
 
@@ -80,7 +83,8 @@ else
                     <span>คงค้าง <strong class="ds-tabular @(bill.OutstandingQty > 0m ? "borrow-num--attention" : "")">@bill.OutstandingQty.ToString("N0")</strong></span>
                     @if (bill.CanReturnAll)
                     {
-                        <span class="dot"></span><a class="borrow-inline-action" asp-page="/Borrow/ReturnBill" asp-route-billRecordNumber="@b.SourceRecordNumber">คืนครบทั้งบิล…</a>
+                        <span class="dot"></span><a class="borrow-inline-action borrow-bill-return" asp-page="/Borrow/ReturnBill" asp-route-billRecordNumber="@b.SourceRecordNumber"
+                           data-bill="@b.SourceRecordNumber" data-receive-no="@b.ReceiveNo" data-outstanding="@bill.OutstandingQty.ToString("N0")" data-items="@bill.Items.Count(x => x.CanReturn)">คืนครบทั้งบิล…</a>
                     }
                     <span class="dot"></span><a class="borrow-inline-action" asp-page="/Borrow/History" asp-route-receiveNo="@b.ReceiveNo">ประวัติ</a>
                 </span>

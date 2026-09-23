@@ -160,6 +160,38 @@ public sealed class BorrowWorkflowPageTests : IDisposable
     }
 
     [Fact]
+    public async Task Inline_bill_return_records_every_open_item_in_place()
+    {
+        await PrimeAsync();
+        var (token, _, _) = await InlineFormAsync(900);
+        var html = await _client.GetStringAsync("/Borrow/Facility/CUB001?status=all");
+        // the bill action degrades to the confirmation page without JavaScript, and carries the data the script needs
+        var link = Regex.Matches(html, "<a class=\"borrow-inline-action borrow-bill-return\"[^>]*>").Cast<Match>().Single(m => m.Value.Contains("data-bill=\"100\"")).Value;
+        Assert.Contains("href=\"/Borrow/ReturnBill/100\"", link);
+        Assert.Contains("data-bill=\"100\"", link);
+        Assert.Contains("data-outstanding=\"500\"", link);
+        Assert.Contains("id=\"borrow-antiforgery\"", html);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/Borrow/Facility/CUB001?status=all&handler=ReturnBill")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["billRecordNumber"] = "100", ["clientRequestId"] = Guid.NewGuid().ToString("D"), ["__RequestVerificationToken"] = token,
+            }),
+        };
+        request.Headers.Add("X-Requested-With", "fetch");
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var fragment = WebUtility.HtmlDecode(await response.Content.ReadAsStringAsync());
+        Assert.DoesNotContain("<html", fragment);
+        Assert.Contains("บันทึกคืนครบทั้งบิล (2 รายการ) เรียบร้อย", fragment);
+        Assert.Equal(2, _factory.Returns.Events.Count);
+        Assert.Equal(500m, _factory.Returns.Events.Sum(e => e.QuantityDelta));
+        var summary = Text(Regex.Match(fragment, "<div class=\"borrow-summary\".*?</div>", RegexOptions.Singleline).Value);
+        Assert.Contains("คืนแล้ว 500", summary); Assert.Contains("คงค้าง 250", summary);
+    }
+
+    [Fact]
     public async Task Inline_return_validates_server_side_and_falls_back_to_redirect_without_javascript()
     {
         await PrimeAsync();

@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using Invc.Core.Borrow;
 using Invc.Core.Inventory;
 using Invc.Web.Borrow;
@@ -112,6 +112,42 @@ public class FacilityModel(BorrowScreenService screens, IBorrowReturnRepository 
         if (InlineError is not null) Problem = InlineError;
         return RedirectToPage("/Borrow/Facility", null,
             new { facilityCode = FacilityCode, status = Filter.ToQueryValue(), q = Keyword }, $"item-{Quick.ItemRecordNumber}");
+    }
+
+    /// <summary>
+    /// Inline "คืนครบทั้งบิล" from a bill header. Confirmed in the browser (or on the /Borrow/ReturnBill page without
+    /// JavaScript); the write is the same single transaction that returns the CURRENT outstanding quantity of every open
+    /// item of the bill — any item failing validation rolls the whole bill back.
+    /// </summary>
+    public async Task<IActionResult> OnPostReturnBillAsync(string? facilityCode, int billRecordNumber, string? clientRequestId, CancellationToken cancellationToken)
+    {
+        if (!Prepare(facilityCode)) return NotFound();
+        try
+        {
+            var result = await returns.RecordBillReturnAsync(billRecordNumber, clock.GetLocalNow().DateTime, screens.CurrentActor(), null, clientRequestId, cancellationToken);
+            if (result.Succeeded)
+            {
+                InlineNotice = result.WasDuplicate
+                    ? "การคืนทั้งบิลนี้ถูกบันทึกไว้แล้ว (ไม่บันทึกซ้ำ)"
+                    : $"บันทึกคืนครบทั้งบิล ({result.EventIds.Count:N0} รายการ) เรียบร้อย";
+            }
+            else
+            {
+                InlineError = result.Error;
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogError(ex, "Inline borrow bill return failed (bill {Bill})", billRecordNumber);
+            InlineError = BorrowScreenService.StoreError;
+        }
+
+        if (!await LoadAsync(cancellationToken) && !HasError) return NotFound();
+        if (IsAjax) return Partial("_FacilityBody", this);
+        if (InlineNotice is not null) Notice = InlineNotice;
+        if (InlineError is not null) Problem = InlineError;
+        return RedirectToPage("/Borrow/Facility", null,
+            new { facilityCode = FacilityCode, status = Filter.ToQueryValue(), q = Keyword }, $"bill-{billRecordNumber}");
     }
 
     private bool IsAjax => string.Equals(Request.Headers["X-Requested-With"], "fetch", StringComparison.OrdinalIgnoreCase);
