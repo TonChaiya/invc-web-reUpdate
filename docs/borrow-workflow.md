@@ -1,4 +1,4 @@
-# Borrow ("ยายืมจากหน่วยงานอื่น") — return workflow: operations guide
+﻿# Borrow ("ยายืมจากหน่วยงานอื่น") — return workflow: operations guide
 
 Completed 2026-09-22 (migration 002). Companion of `docs/borrow-data-map.md` (source facts, mirror schema, reconciliation).
 
@@ -43,6 +43,17 @@ For every item still outstanding, the facility page shows non-borrow receipts (`
 
 ## 9. Screens
 `/Borrow` work board (filter คงค้าง · คืนบางส่วน · คืนครบ · ทั้งหมด, default คงค้าง; totals สถานบริการ · บิล · ยืม · คืนแล้ว · คงค้าง) → `/Borrow/Facility/{code}` (bills with status/totals, items with ยืม/คืนแล้ว/คงเหลือ, status chips, บันทึกคืน, คืนครบทั้งบิล…, advisory hints, item/bill history links; filters by status and keyword incl. lot/receive/invoice) → `/Borrow/Return/{item}`, `/Borrow/ReturnBill/{bill}` → `/Borrow/History` (facility / receive no / item / date / actor; newest first; ย้อนกลับ… on reversible RETURNs) → `/Borrow/Correct/{event}`. Drug names A–Z inside a bill (owner rule).
+
+The Borrow module has two top-level views: **สถานบริการ** (`/Borrow`, the operational board above) and **สรุปคงค้าง**
+(`/Borrow/Outstanding`, review only). สรุปคงค้าง aggregates the work that is still open by **facility × WORKING_CODE**
+instead of by bill, because the same medicine is usually borrowed on several bills: one row per medicine with bill
+count, ยืม, คืนแล้ว and the primary **ต้องคืน**, a native `<details>` drill-down to the source bills (RECEIVE_NO,
+receive date, per-bill figures), per-facility totals (จำนวนรายการยา = distinct working codes, not source lines) and a
+compact overall strip. Only items with `OutstandingQty > 0` take part, so fully returned and conflict items never
+appear; search (facility code/name, working code, drug name, receive/invoice number) filters **before** aggregation so
+the totals always describe the displayed rows. Facilities are ordered by outstanding quantity (largest first),
+medicines A–Z. It is derived in memory from the same work board (`BorrowOutstandingSummary.Build` in Core) — no extra
+query, no new table — and is **read-only in both hosting modes**: returns are recorded on the facility screen.
 
 ## 10. Failure behaviour
 - MySQL unreachable or `AppDatabase__ConnectionString` missing: every Borrow screen returns HTTP 200 with the in-page message "ไม่สามารถอ่านข้อมูลยายืมจากฐานข้อมูลของเว็บได้ … สถานะระบบ"; `/Health` shows **ฐานข้อมูลของเว็บ (ยายืม): ล้มเหลว / ยังไม่ตั้งค่า** while the INV status stays readable; all non-Borrow pages are unaffected. The MySQL factory validates lazily (never during DI activation).
