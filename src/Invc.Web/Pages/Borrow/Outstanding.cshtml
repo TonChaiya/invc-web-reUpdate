@@ -1,0 +1,130 @@
+﻿@page
+@model Invc.Web.Pages.Borrow.OutstandingModel
+@{
+    ViewData["Title"] = "สรุปคงค้าง";
+    ViewData["HideNavSearch"] = true;
+    string D(DateTime? d) => d?.ToString("d MMM yyyy") ?? "–";
+}
+
+<div class="borrow-page ds-page">
+    <div class="borrow-header">
+        <div>
+            <h1 class="borrow-title">ยายืม</h1>
+            <p class="borrow-subtitle">สรุปคงค้าง — รวมรายการยาที่ยังต้องคืน แยกตามสถานบริการ (ยาชนิดเดียวกันรวมจากทุกบิล)</p>
+        </div>
+        <div class="borrow-sync" aria-live="polite">
+            @if (Model.Sync is { } s)
+            {
+                <span>ซิงก์ INV <time datetime="@s.SyncedAt.ToString("s")">@s.SyncedAt.ToString("d MMM yyyy HH:mm")</time></span>
+            }
+            @if (Model.SyncError is not null) { <span class="borrow-sync-warning" role="status">@Model.SyncError</span> }
+            <a class="borrow-history-link" asp-page="/Borrow/History">ประวัติการคืน</a>
+        </div>
+    </div>
+
+    @* the two top-level views of the Borrow module *@
+    <nav class="borrow-views" aria-label="มุมมอง">
+        <a class="borrow-view" asp-page="/Borrow/Index">สถานบริการ</a>
+        <a class="borrow-view is-active" asp-page="/Borrow/Outstanding" aria-current="page">สรุปคงค้าง</a>
+    </nav>
+
+    @if (Model.HasError)
+    {
+        <div class="ds-error" role="alert">@Model.ErrorMessage — ดู <a asp-page="/Health">สถานะระบบ</a></div>
+    }
+    else
+    {
+        <div class="borrow-summary" role="group" aria-label="สรุปคงค้างทั้งหมด">
+            <span class="borrow-stat">สถานบริการ <strong>@Model.Summary.FacilityCount.ToString("N0")</strong></span>
+            <span class="borrow-stat">รายการยา <strong>@Model.Summary.DrugCount.ToString("N0")</strong></span>
+            <span class="borrow-stat">บิล <strong>@Model.Summary.BillCount.ToString("N0")</strong></span>
+            <span class="borrow-stat">ยืม <strong>@Model.Summary.BorrowedQty.ToString("N0")</strong></span>
+            <span class="borrow-stat">คืนแล้ว <strong>@Model.Summary.ReturnedQty.ToString("N0")</strong></span>
+            <span class="borrow-stat borrow-stat--attention">ต้องคืน <strong>@Model.Summary.OutstandingQty.ToString("N0")</strong></span>
+        </div>
+
+        <form method="get" class="borrow-toolbar" role="search" aria-label="ค้นหาในสรุปคงค้าง">
+            <label class="visually-hidden" for="q">ค้นหา</label>
+            <input class="ds-input" type="search" id="q" name="q" value="@Model.Keyword"
+                   maxlength="@Invc.Core.Inventory.SearchKeyword.MaxLength" autocomplete="off"
+                   placeholder="ค้นหาสถานบริการ รหัสยา ชื่อยา หรือเลขบิล" />
+            <button class="ds-btn ds-btn-primary" type="submit">ค้นหา</button>
+            @if (Model.Keyword is not null) { <a class="ds-btn ds-btn-secondary" asp-page="/Borrow/Outstanding">ล้าง</a> }
+        </form>
+
+        <p class="borrow-result-meta" aria-live="polite">
+            <strong>ยาที่ยังต้องคืน</strong> · @Model.Summary.FacilityCount.ToString("N0") สถานบริการ · @Model.Summary.DrugCount.ToString("N0") รายการยา
+            @if (Model.Keyword is not null) { <text>· ค้นหา “@Model.Keyword”</text> }
+        </p>
+
+        @if (Model.Summary.IsEmpty)
+        {
+            <div class="borrow-empty" role="status">
+                @if (Model.Board.OutstandingQty <= 0m) { <text>ไม่มียาค้างคืน — คืนครบทุกสถานบริการแล้ว</text> }
+                else if (Model.Keyword is not null) { <text>ไม่พบรายการค้างคืนที่ตรงกับ “@Model.Keyword”</text> }
+                else { <text>ไม่มีรายการค้างคืน</text> }
+            </div>
+        }
+
+        @foreach (var f in Model.Summary.Facilities)
+        {
+            <section class="borrow-bill borrow-osum-facility" aria-label="@f.DisplayName">
+                <header class="borrow-bill-head">
+                    <span class="borrow-bill-no">
+                        <a asp-page="/Borrow/Facility" asp-route-facilityCode="@f.FacilityCode" asp-route-status="outstanding">@f.DisplayName</a>
+                    </span>
+                    <span class="borrow-bill-meta">
+                        <span>@f.FacilityCode</span><span class="dot"></span>
+                        <span>รายการยา <strong class="ds-tabular">@f.DrugCount.ToString("N0")</strong></span><span class="dot"></span>
+                        <span>บิล <strong class="ds-tabular">@f.BillCount.ToString("N0")</strong></span><span class="dot"></span>
+                        <span>ยืม <strong class="ds-tabular">@f.BorrowedQty.ToString("N0")</strong></span><span class="dot"></span>
+                        <span>คืนแล้ว <strong class="ds-tabular">@f.ReturnedQty.ToString("N0")</strong></span><span class="dot"></span>
+                        <span>ต้องคืน <strong class="ds-tabular borrow-num--attention">@f.OutstandingQty.ToString("N0")</strong></span>
+                    </span>
+                </header>
+
+                <div class="borrow-osum-head" aria-hidden="true">
+                    <span>รายการยา</span><span>บิล</span><span>ยืม</span><span>คืนแล้ว</span><span>ต้องคืน</span>
+                </div>
+                <div class="borrow-osum-list">
+                @foreach (var d in f.Drugs)
+                {
+                    <div class="borrow-osum-row">
+                        <div class="borrow-osum-main">
+                            <a class="borrow-item-name" asp-page="/Inventory/Detail" asp-route-workingCode="@d.WorkingCode">@d.DrugName</a>
+                            <div class="borrow-item-meta"><span>@d.WorkingCode</span></div>
+                            <details class="borrow-osum-bills">
+                                <summary>ดู @d.BillCount.ToString("N0") บิล</summary>
+                                <ul class="borrow-osum-bill-list">
+                                    @foreach (var b in d.Bills)
+                                    {
+                                        <li>
+                                            <a asp-page="/Borrow/History" asp-route-receiveNo="@b.ReceiveNo">@b.ReceiveNo</a>
+                                            <span class="dot"></span><span>รับ @D(b.DateReceive)</span>
+                                            @if (!string.IsNullOrWhiteSpace(b.InvoiceNo)) { <span class="dot"></span><span>เอกสาร @b.InvoiceNo</span> }
+                                            <span class="dot"></span><span>ยืม <span class="ds-tabular">@b.BorrowedQty.ToString("N0")</span></span>
+                                            <span class="dot"></span><span>คืน <span class="ds-tabular">@b.ReturnedQty.ToString("N0")</span></span>
+                                            <span class="dot"></span><span>ค้าง <span class="ds-tabular borrow-num--attention">@b.OutstandingQty.ToString("N0")</span></span>
+                                        </li>
+                                    }
+                                </ul>
+                            </details>
+                        </div>
+                        <span class="borrow-osum-num ds-tabular" data-label="บิล">@d.BillCount.ToString("N0")</span>
+                        <span class="borrow-osum-num ds-tabular" data-label="ยืม">@d.BorrowedQty.ToString("N0")</span>
+                        <span class="borrow-osum-num ds-tabular borrow-num--done" data-label="คืนแล้ว">@d.ReturnedQty.ToString("N0")</span>
+                        <span class="borrow-osum-num ds-tabular borrow-num--attention" data-label="ต้องคืน"><strong>@d.OutstandingQty.ToString("N0")</strong></span>
+                    </div>
+                }
+                </div>
+                <div class="borrow-osum-row borrow-osum-total">
+                    <div class="borrow-osum-main">รวม @f.DisplayName</div>
+                    <span class="borrow-osum-num ds-tabular" data-label="บิล">@f.BillCount.ToString("N0")</span>
+                    <span class="borrow-osum-num ds-tabular" data-label="ยืม">@f.BorrowedQty.ToString("N0")</span>
+                    <span class="borrow-osum-num ds-tabular borrow-num--done" data-label="คืนแล้ว">@f.ReturnedQty.ToString("N0")</span>
+                    <span class="borrow-osum-num ds-tabular borrow-num--attention" data-label="ต้องคืน"><strong>@f.OutstandingQty.ToString("N0")</strong></span>
+                </div>
+            </section>
+        }
+    }
+</div>

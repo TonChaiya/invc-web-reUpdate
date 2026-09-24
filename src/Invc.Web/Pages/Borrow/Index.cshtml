@@ -24,6 +24,12 @@
         </div>
     </div>
 
+    @* the two top-level views of the Borrow module *@
+    <nav class="borrow-views" aria-label="มุมมอง">
+        <a class="borrow-view is-active" asp-page="/Borrow/Index" aria-current="page">สถานบริการ</a>
+        <a class="borrow-view" asp-page="/Borrow/Outstanding">สรุปคงค้าง</a>
+    </nav>
+
     @if (Model.Notice is not null) { <div class="ds-notice" role="status">@Model.Notice</div> }
 
     @if (Model.HasError)

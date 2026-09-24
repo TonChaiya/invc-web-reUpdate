@@ -1,4 +1,4 @@
-/* ==========================================================================
+﻿/* ==========================================================================
    INVC Web — application visual system (Bootstrap 5 primitives + small set of reusable classes)
    Colour semantics: red = actionable/urgent, yellow = warning, green = healthy/complete, blue/neutral = information.
    Never rely on colour alone: every state also carries a text label.
@@ -793,6 +793,37 @@ a:focus-visible, button:focus-visible, .btn:focus-visible, .form-control:focus-v
 .borrow-event-note { font-size: .86rem; color: var(--text-secondary); max-width: 16rem; }
 .borrow-event.is-correction > td { background: var(--danger-soft); }
 .borrow-item-history { margin-top: var(--sp-4); }
+
+/* --- Borrow view switch (สถานบริการ | สรุปคงค้าง) -------------------------------------------------------------- */
+.borrow-views { display: flex; gap: var(--sp-2); margin-bottom: var(--sp-3); }
+.borrow-view { padding: 5px var(--sp-3); border-bottom: 2px solid transparent; color: var(--text-secondary); text-decoration: none; font-size: .92rem; font-weight: 500; }
+.borrow-view:hover { color: var(--text); }
+.borrow-view.is-active { color: var(--primary); border-bottom-color: var(--primary); }
+
+/* --- สรุปคงค้าง: dense rows, one per facility x medicine; numbers right-aligned and comparable vertically ------- */
+.borrow-osum-head, .borrow-osum-row { display: grid; grid-template-columns: minmax(0, 1fr) 4rem 6rem 6rem 6.5rem; column-gap: var(--sp-3); align-items: start; padding: 9px var(--sp-4); }
+.borrow-osum-head { font-size: .8rem; font-weight: 500; color: var(--text-secondary); background: var(--surface-subtle); border-bottom: 1px solid var(--border); padding-top: 4px; padding-bottom: 4px; }
+.borrow-osum-head span:not(:first-child), .borrow-osum-num { text-align: right; }
+.borrow-osum-row { border-bottom: 1px solid var(--border); }
+.borrow-osum-row:hover { background: var(--surface-soft); }
+.borrow-osum-main { min-width: 0; }
+.borrow-osum-num { white-space: nowrap; }
+.borrow-osum-total { background: var(--surface-subtle); border-bottom: 0; font-weight: 600; }
+.borrow-osum-bills { margin-top: 2px; }
+.borrow-osum-bills > summary { display: inline-block; cursor: pointer; font-size: .82rem; color: var(--primary); }
+.borrow-osum-bill-list { list-style: none; margin: var(--sp-2) 0 var(--sp-2); padding: 0 0 0 var(--sp-3); border-left: 2px solid var(--border); font-size: .84rem; color: var(--text-secondary); }
+.borrow-osum-bill-list li { padding: 2px 0; }
+
+@media (max-width: 991.98px) {
+  .borrow-osum-head, .borrow-osum-row { grid-template-columns: minmax(0, 1fr) 3.5rem 5rem 5rem 5.5rem; }
+}
+@media (max-width: 767.98px) {
+  /* phone: the medicine takes the full row, the figures wrap underneath with their labels (never a scrolling table) */
+  .borrow-osum-head { display: none; }
+  .borrow-osum-row { grid-template-columns: minmax(0, 1fr); row-gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); }
+  .borrow-osum-num { text-align: left; }
+  .borrow-osum-num::before { content: attr(data-label) " "; font-size: .78rem; color: var(--text-tertiary); }
+}
 
 @media (max-width: 1199.98px) {
   .borrow-item-head, .borrow-item-row { grid-template-columns: minmax(0, 1fr) 4.5rem 4.5rem 5rem 14rem; }
