@@ -1,5 +1,6 @@
-﻿@using Invc.Core.Borrow
+@using Invc.Core.Borrow
 @model Invc.Web.Pages.Borrow.FacilityModel
+@inject Invc.Web.ExternalAccessMode Access
 @*
     Everything below the facility header: summary strip, status control band, result meta and the bill list.
     This partial is re-rendered by the page's "Return" handler and swapped into #borrow-body, so an inline return
@@ -81,7 +82,7 @@ else
                     <span>ยืม <strong class="ds-tabular">@bill.BorrowedQty.ToString("N0")</strong></span><span class="dot"></span>
                     <span>คืนแล้ว <strong class="ds-tabular">@bill.ReturnedQty.ToString("N0")</strong></span><span class="dot"></span>
                     <span>คงค้าง <strong class="ds-tabular @(bill.OutstandingQty > 0m ? "borrow-num--attention" : "")">@bill.OutstandingQty.ToString("N0")</strong></span>
-                    @if (bill.CanReturnAll)
+                    @if (bill.CanReturnAll && !Access.IsReadOnly)
                     {
                         <span class="dot"></span><a class="borrow-inline-action borrow-bill-return" asp-page="/Borrow/ReturnBill" asp-route-billRecordNumber="@b.SourceRecordNumber"
                            data-bill="@b.SourceRecordNumber" data-receive-no="@b.ReceiveNo" data-outstanding="@bill.OutstandingQty.ToString("N0")" data-items="@bill.Items.Count(x => x.CanReturn)">คืนครบทั้งบิล…</a>
@@ -131,7 +132,7 @@ else
                     <div class="borrow-item-actions">
                         @if (item.HasConflict) { <span class="status-chip status-review" title="คืนแล้ว @item.ReturnedQty.ToString("N0") มากกว่ายอดยืม @item.BorrowedQty.ToString("N0")">ต้องตรวจสอบ</span> }
                         else { <span class="status-chip @item.Status.ChipClass()">@item.Status.ThaiLabel()</span> }
-                        @if (item.CanReturn)
+                        @if (item.CanReturn && !Access.IsReadOnly)
                         {
                             @* inline return: stays on this page (JS swaps the body); without JS the handler redirects back here *@
                             <form method="post" class="borrow-quick-return" asp-page-handler="Return" asp-route-facilityCode="@Model.FacilityCode" asp-route-status="@Model.Filter.ToQueryValue()" asp-route-q="@Model.Keyword">

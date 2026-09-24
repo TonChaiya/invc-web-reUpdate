@@ -27,6 +27,9 @@ builder.Services.AddInvcReadOnlyData(builder.Configuration);
 // Application-owned MySQL database (invc_web) — the Borrow module's writable mirror. Schema comes from db/mysql via
 // scripts/mysql-migrate.ps1, never from startup. SQL Server INV stays SELECT-only.
 builder.Services.AddInvcAppData(builder.Configuration);
+// External (DDNS) hosting of the same release runs anonymously and may only read; the internal Windows-authenticated
+// application leaves the flag off. Enforced by the guard middleware below, not only in the UI.
+builder.Services.AddSingleton(new ExternalAccessMode(builder.Configuration.GetValue<bool>(ExternalAccessMode.ConfigurationKey)));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<Invc.Web.Borrow.BorrowScreenService>();
@@ -41,6 +44,9 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseInvcSecurityHeaders();
+
+// External read-only hosting: refuse every write before routing (no-op for the internal application).
+app.UseInvcExternalReadOnlyGuard();
 
 // Legacy pages render Thai text and Buddhist-era years; pin the culture so output does not
 // depend on the hosting server's regional settings.

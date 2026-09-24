@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Security.Principal;
 using Invc.Core.Borrow;
+using Invc.Web;
 using Invc.Web.Borrow;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -18,7 +19,7 @@ public class BorrowActorIdentityTests
     private static BorrowScreenService Service(HttpContext? context)
     {
         var accessor = new HttpContextAccessor { HttpContext = context };
-        return new BorrowScreenService(null!, null!, null!, null!, accessor, NullLogger<BorrowScreenService>.Instance);
+        return new BorrowScreenService(null!, null!, null!, null!, accessor, new ExternalAccessMode(false), NullLogger<BorrowScreenService>.Instance);
     }
 
     private static DefaultHttpContext Authenticated(string name)

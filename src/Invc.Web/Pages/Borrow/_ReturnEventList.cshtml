@@ -1,5 +1,6 @@
 @using Invc.Core.Borrow
 @model IReadOnlyList<BorrowReturnEvent>
+@inject Invc.Web.ExternalAccessMode Access
 @*
     Return / correction trail (newest first). Shared by /Borrow/History, /Borrow/Return/{item} and /Borrow/Correct/{event}.
     A RETURN event that still has reversible quantity offers the restrained "ย้อนกลับ" link; corrections are never editable.
@@ -35,7 +36,7 @@
                 <td class="ds-col-secondary borrow-event-actor">@e.Actor</td>
                 <td class="ds-col-secondary borrow-event-note">@(e.Note ?? "–")</td>
                 <td class="borrow-event-actions">
-                    @if (isReturn && e.ReversibleQty > 0m) { <a class="borrow-inline-action" asp-page="/Borrow/Correct" asp-route-eventId="@e.Id">ย้อนกลับ…</a> }
+                    @if (isReturn && e.ReversibleQty > 0m && !Access.IsReadOnly) { <a class="borrow-inline-action" asp-page="/Borrow/Correct" asp-route-eventId="@e.Id">ย้อนกลับ…</a> }
                     else if (isReturn) { <span class="ds-note">ย้อนกลับครบแล้ว</span> }
                 </td>
             </tr>

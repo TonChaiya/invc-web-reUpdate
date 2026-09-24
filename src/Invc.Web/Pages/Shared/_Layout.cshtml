@@ -1,3 +1,4 @@
+@inject Invc.Web.ExternalAccessMode Access
 @{
     var currentPage = ViewContext.RouteData.Values["page"] as string ?? string.Empty;
     bool IsIn(string prefix) => currentPage.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
@@ -67,6 +68,11 @@
                     </form>
                 }
             </header>
+            @if (Access.IsReadOnly)
+            {
+                @* External (DDNS) hosting: one quiet strip, never repeated per page. *@
+                <p class="app-readonly-note" role="status">@Invc.Web.ExternalAccessMode.Banner</p>
+            }
             <main role="main" class="app-content">
                 @RenderBody()
             </main>

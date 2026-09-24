@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Text.RegularExpressions;
 using Invc.Core.Borrow;
 using Microsoft.AspNetCore.Hosting;
@@ -13,17 +13,26 @@ public sealed class BorrowPageUiTests : IClassFixture<BorrowPageUiTests.Factory>
 {
     public sealed class Factory : WebApplicationFactory<Program>
     {
-        public InMemoryMirror Mirror { get; } = new();
-        public FakeSource Source { get; } = new();
+        public InMemoryMirror Mirror { get; }
+        public FakeSource Source { get; }
         public InMemoryReturns Returns { get; }
-        public FakeAdvisory Advisory { get; } = new();
-        public Factory() { Returns = new InMemoryReturns(Mirror); }
+        public FakeAdvisory Advisory { get; }
+        /// <summary>Hosts the release in external (DDNS) read-only mode: anonymous, every write refused.</summary>
+        public bool ExternalReadOnly { get; }
+        public Factory() { Mirror = new InMemoryMirror(); Source = new FakeSource(); Advisory = new FakeAdvisory(); Returns = new InMemoryReturns(Mirror); }
+        /// <summary>A second host over the SAME in-memory stores — lets a test compare internal and external hosting of one dataset.</summary>
+        internal Factory(Factory shared, bool externalReadOnly)
+        {
+            Mirror = shared.Mirror; Source = shared.Source; Advisory = shared.Advisory; Returns = shared.Returns;
+            ExternalReadOnly = externalReadOnly;
+        }
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Development");
             builder.UseSetting("InvDatabase:ConnectionString", "Server=test;Initial Catalog=INV;Integrated Security=True");
             builder.UseSetting("AppDatabase:ConnectionString", "Server=127.0.0.1;Database=invc_web_test;User ID=root;Password=;");
+            builder.UseSetting(Invc.Web.ExternalAccessMode.ConfigurationKey, ExternalReadOnly ? "true" : "false");
             builder.ConfigureServices(services =>
             {
                 services.RemoveAll<IBorrowSourceRepository>();

@@ -9,7 +9,8 @@ namespace Invc.Web.Borrow;
 /// so the pages render their own error state instead of the global /Error page.
 /// </summary>
 public sealed class BorrowScreenService(BorrowSyncService sync, IBorrowMirrorRepository mirror, IBorrowReturnRepository returns,
-                                        IBorrowReceiptAdvisoryRepository advisory, IHttpContextAccessor http, ILogger<BorrowScreenService> logger)
+                                        IBorrowReceiptAdvisoryRepository advisory, IHttpContextAccessor http, ExternalAccessMode access,
+                                        ILogger<BorrowScreenService> logger)
 {
     public const string StoreError = "ไม่สามารถอ่านข้อมูลยายืมจากฐานข้อมูลของเว็บได้ กรุณาตรวจสอบหน้า สถานะระบบ";
     public const string SyncWarning = "ไม่สามารถซิงก์ข้อมูลจาก INV ได้ในขณะนี้ — แสดงข้อมูลที่ซิงก์ไว้ล่าสุด";
@@ -21,6 +22,9 @@ public sealed class BorrowScreenService(BorrowSyncService sync, IBorrowMirrorRep
     /// <summary>Full-snapshot reconciliation. INV read failure ⇒ mirror untouched + warning; MySQL failure ⇒ also a warning (the page then reports the store error on read).</summary>
     public async Task<SyncOutcome> TrySyncAsync(CancellationToken ct)
     {
+        // External read-only hosting never writes to the application database — not even the mirror. It displays the
+        // state that the internal, authenticated application synchronised.
+        if (access.IsReadOnly) return new SyncOutcome(null, null);
         try { return new SyncOutcome(await sync.SyncAsync(ct), null); }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
